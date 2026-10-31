@@ -37,6 +37,8 @@
 
 安装源默认使用 Microsoft 365 企业应用版的官方镜像地址，可自行替换为其他产品的镜像链接。
 
+遇到问题先看 [常见问题](docs/FAQ.md)。
+
 ## 从源码构建
 
 需要 Windows 自带的 .NET Framework 编译器（通过 PowerShell 的 `Add-Type` 调用）：
