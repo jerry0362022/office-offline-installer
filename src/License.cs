@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -109,7 +110,7 @@ namespace O365Installer
     {
         TextBox txtOut, txtKey, txtKms;
         Label lblSummary;
-        Button btnRefresh, btnKey, btnKms, btnClose, btnWord;
+        Button btnRefresh, btnKey, btnKms, btnClose, btnWord, btnIid, btnUnp;
         bool busy;
 
         public LicenseForm()
@@ -194,8 +195,8 @@ namespace O365Installer
 
             btnWord = new Button();
             btnWord.Text = "打开 Word 登录";
-            btnWord.Location = new Point(126, 410);
-            btnWord.Size = new Size(120, 32);
+            btnWord.Location = new Point(112, 410);
+            btnWord.Size = new Size(110, 32);
             btnWord.Click += delegate
             {
                 string exe = OfficeLicense.FindWordExe();
@@ -208,6 +209,20 @@ namespace O365Installer
                 catch (Exception ex) { MessageBox.Show(ex.Message, "启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error); }
             };
             Controls.Add(btnWord);
+
+            btnIid = new Button();
+            btnIid.Text = "安装 ID";
+            btnIid.Location = new Point(228, 410);
+            btnIid.Size = new Size(100, 32);
+            btnIid.Click += async delegate { await ShowInstallId(); };
+            Controls.Add(btnIid);
+
+            btnUnp = new Button();
+            btnUnp.Text = "卸载密钥";
+            btnUnp.Location = new Point(334, 410);
+            btnUnp.Size = new Size(100, 32);
+            btnUnp.Click += async delegate { await RemoveKey(); };
+            Controls.Add(btnUnp);
 
             btnClose = new Button();
             btnClose.Text = "关闭";
@@ -224,6 +239,110 @@ namespace O365Installer
             btnKey.Enabled = !b;
             btnKms.Enabled = !b;
             btnClose.Enabled = !b;
+            btnIid.Enabled = !b;
+            btnUnp.Enabled = !b;
+        }
+
+        static string PromptInput(string title, string label, string def)
+        {
+            Form d = new Form();
+            d.Text = title;
+            d.ClientSize = new Size(420, 150);
+            d.StartPosition = FormStartPosition.CenterParent;
+            d.FormBorderStyle = FormBorderStyle.FixedDialog;
+            d.MaximizeBox = false;
+            d.MinimizeBox = false;
+            d.ShowInTaskbar = false;
+            d.Font = new Font("Microsoft YaHei UI", 9F);
+
+            Label t = new Label();
+            t.Text = label;
+            t.Location = new Point(16, 16);
+            t.Size = new Size(388, 20);
+            d.Controls.Add(t);
+
+            TextBox tb = new TextBox();
+            tb.Location = new Point(16, 42);
+            tb.Size = new Size(388, 24);
+            tb.CharacterCasing = CharacterCasing.Upper;
+            tb.Text = def;
+            d.Controls.Add(tb);
+
+            Button ok = new Button();
+            ok.Text = "确定";
+            ok.Location = new Point(226, 96);
+            ok.Size = new Size(84, 32);
+            ok.DialogResult = DialogResult.OK;
+            d.Controls.Add(ok);
+
+            Button no = new Button();
+            no.Text = "取消";
+            no.Location = new Point(320, 96);
+            no.Size = new Size(84, 32);
+            no.DialogResult = DialogResult.Cancel;
+            d.Controls.Add(no);
+
+            d.AcceptButton = ok;
+            d.CancelButton = no;
+
+            string result = null;
+            if (d.ShowDialog() == DialogResult.OK) result = tb.Text.Trim();
+            d.Dispose();
+            return result;
+        }
+
+        async Task ShowInstallId()
+        {
+            SetBusy(true);
+            try
+            {
+                string outp = await Task.Run(delegate { return OfficeLicense.Run("/dinstid"); });
+                txtOut.Text = outp;
+
+                Match m = Regex.Match(outp, @"(\d[\d\s\-]{18,}\d)");
+                string iid = m.Success ? m.Groups[1].Value.Replace(" ", "").Replace("-", "").Trim() : null;
+                if (!string.IsNullOrEmpty(iid))
+                {
+                    try { Clipboard.SetText(iid); } catch { }
+                    MessageBox.Show("安装 ID 已复制到剪贴板：\r\n\r\n" + iid + "\r\n\r\n用于电话激活时向微软客服提供。",
+                        "安装 ID", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    MessageBox.Show("未从输出中解析出安装 ID，请查看窗口内的原始输出。",
+                        "安装 ID", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "获取安装 ID 失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally { SetBusy(false); }
+        }
+
+        async Task RemoveKey()
+        {
+            string tail = PromptInput("卸载密钥", "输入要卸载的产品密钥后 5 位（ospp /unpkey）", "");
+            if (tail == null) return;
+            tail = tail.Trim().ToUpper();
+            if (tail.Length != 5)
+            {
+                MessageBox.Show("需要 5 位字符，通常是密钥的最后一段。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            SetBusy(true);
+            try
+            {
+                string outp = await Task.Run(delegate { return OfficeLicense.Run("/unpkey:" + tail); });
+                txtOut.Text = outp;
+                RefreshStatus();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "卸载密钥失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally { SetBusy(false); }
         }
 
         void RefreshStatus()
@@ -245,6 +364,8 @@ namespace O365Installer
                 txtKms.Enabled = false;
                 btnKey.Enabled = false;
                 btnKms.Enabled = false;
+                btnIid.Enabled = false;
+                btnUnp.Enabled = false;
                 btnWord.Enabled = OfficeLicense.FindWordExe() != null;
                 return;
             }
@@ -253,6 +374,8 @@ namespace O365Installer
             txtKms.Enabled = true;
             btnKey.Enabled = !busy;
             btnKms.Enabled = !busy;
+            btnIid.Enabled = !busy;
+            btnUnp.Enabled = !busy;
             btnWord.Enabled = true;
 
             string outp;
