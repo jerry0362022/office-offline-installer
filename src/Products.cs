@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace O365Installer
@@ -9,8 +9,8 @@ namespace O365Installer
         public string Name;
         public string Family;
         public string Channel;
-        public bool Img;        // 是否有微软官方 .img 离线镜像（仅 Microsoft 365 零售）
-        public bool SingleApp;  // 单应用产品，不走组件排除
+        public bool Img;
+        public bool SingleApp;
 
         public ProductDef(string id, string name, string family, string channel, bool img, bool singleApp)
         {
@@ -40,20 +40,16 @@ namespace O365Installer
             l.Add(new ProductDef(id, name, "单独应用", "Current", false, true));
         }
 
-        // 产品清单参照微软官方 Office 部署工具支持的产品 ID
-        // 零售版使用 Current 通道；批量/LTSC 使用 PerpetualVL<年份> 通道
         public static List<ProductDef> All()
         {
             List<ProductDef> l = new List<ProductDef>();
 
-            // ---------- Microsoft 365 ----------
             Img(l, "O365ProPlusRetail", "Microsoft 365 企业应用版", "Microsoft 365", "Current");
             Img(l, "O365BusinessRetail", "Microsoft 365 商业版", "Microsoft 365", "Current");
             Img(l, "O365HomePremRetail", "Microsoft 365 家庭版", "Microsoft 365", "Current");
             A(l, "O365ProPlusEEANoTeamsRetail", "Microsoft 365 企业应用版（不含 Teams）", "Microsoft 365", "Current");
             A(l, "O365BusinessEEANoTeamsRetail", "Microsoft 365 商业版（不含 Teams）", "Microsoft 365", "Current");
 
-            // ---------- Office 2019 / 2021 / 2024 ----------
             string[] years = new string[] { "2024", "2021", "2019" };
             foreach (string y in years)
             {
@@ -83,7 +79,6 @@ namespace O365Installer
                 }
             }
 
-            // ---------- 单独应用 ----------
             string[] apps = new string[] { "Access", "Excel", "OneNote", "Outlook", "PowerPoint", "Publisher", "Word" };
             string[] appCn = new string[] { "Access 数据库", "Excel", "OneNote", "Outlook", "PowerPoint", "Publisher", "Word" };
             for (int i = 0; i < apps.Length; i++)
@@ -94,7 +89,6 @@ namespace O365Installer
             }
             App(l, "OneNoteFreeRetail", "OneNote（免费版）");
 
-            // ---------- Visio ----------
             foreach (string y in years)
             {
                 string fam = "Visio " + y;
@@ -105,7 +99,6 @@ namespace O365Installer
                 A(l, "VisioStd" + y + "Volume", "Visio LTSC 标准版 " + y + "（批量授权）", fam, vl);
             }
 
-            // ---------- Project ----------
             foreach (string y in years)
             {
                 string fam = "Project " + y;

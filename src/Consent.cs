@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 
 namespace O365Installer
 {
-    // 首次运行/每次启动的免责声明，不同意则不允许使用
+
     class ConsentForm : Form
     {
         public const string Body =
@@ -20,8 +20,6 @@ namespace O365Installer
             "6. 本程序按「现状」提供，不提供任何明示或暗示的担保。" + "\r\n\r\n" +
             "7. Microsoft、Office、Microsoft 365 等为微软公司商标，本程序与微软公司无任何隶属或背书关系。";
 
-        // consent = true: 启动前的同意门，不同意则退出
-        // consent = false: 仅查看
         public ConsentForm(bool consent)
         {
             Text = consent ? "免责声明 - 请阅读并确认" : "免责声明";
@@ -87,7 +85,6 @@ namespace O365Installer
             }
         }
 
-        // 返回 true 表示同意
         public static bool Ask()
         {
             using (ConsentForm f = new ConsentForm(true))

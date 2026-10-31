@@ -102,7 +102,6 @@ namespace O365Installer
 
             bool uiTest2 = args.Length > 0 && args[0] == "--uitest";
 
-            // 单实例: 避免两个安装器同时跑 setup.exe 造成 17004 互斥冲突
             bool createdNew = false;
             Mutex single = new Mutex(true, "Global\\O365Installer_SingleRun", out createdNew);
             if (!createdNew && !uiTest2)
@@ -112,7 +111,6 @@ namespace O365Installer
                 return;
             }
 
-            // 必须先同意免责声明才能使用
             if (!uiTest2 && !ConsentForm.Ask()) return;
 
             Application.Run(new MainForm(uiTest2));
@@ -148,7 +146,6 @@ namespace O365Installer
         }
     }
 
-    // 镜像文件损坏（截断、内容缺失），可自动删除重下
     class CorruptImageException : Exception
     {
         public CorruptImageException(string msg) : base(msg) { }
@@ -156,11 +153,10 @@ namespace O365Installer
 
     class MainForm : Form
     {
-        // 微软官方 Office CDN 的 Current Channel（零售）目录
+
         const string CdnBase = "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/";
         const string DefaultUrl = CdnBase + "zh-cn/O365ProPlusRetail.img";
 
-        // Microsoft 365 零售版官方提供的语言（来自 Office CDN 目录结构）
         static readonly string[] LangCodes = new string[]
         {
             "zh-cn", "zh-tw", "en-us",
@@ -179,7 +175,7 @@ namespace O365Installer
         static readonly string WorkDir = Path.Combine(Path.GetTempPath(), "O365_Setup");
         static readonly string LogDir = Path.Combine(WorkDir, "logs");
         static readonly string[] AppNames = new string[] { "Word", "Excel", "PowerPoint", "Outlook", "OneNote", "Teams", "OneDrive", "Access", "Publisher" };
-        // ODT 备用下载地址（动态解析失败时使用）
+
         const string OdtFallbackUrl = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_20430-20146.exe";
 
         static readonly Dictionary<string, string> LangNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -570,7 +566,6 @@ namespace O365Installer
             };
             Controls.Add(btnAbout);
 
-            // 高缩放比屏幕上窗口可能超出工作区，压缩日志区并把底部按钮上移
             int avail = Screen.PrimaryScreen.WorkingArea.Height;
             int over = Height - avail + 6;
             if (over > 0)
@@ -669,7 +664,6 @@ namespace O365Installer
             string url = BuildUrl(p.Id, SelectedLang);
             if (tbUrl.Text != url) tbUrl.Text = url;
         }
-
 
         static void AddLabel(Control parent, string text, int x, int y)
         {
@@ -846,14 +840,13 @@ namespace O365Installer
 
         async Task InstallFromImageOnce(string url, ProductDef prod, string lang, string arch, List<string> exclude, bool keepSource, CancellationToken ct)
         {
-            // 文件名带语言和位数，避免不同语言/位数的镜像互相复用
+
             string img = Path.Combine(WorkDir, prod.Id + "-" + lang + "-x" + arch + ".img");
             string meta = img + ".meta";
             string cfgPath = Path.Combine(WorkDir, "configuration.xml");
             bool mounted = false;
             string drive = null;
 
-            // 兼容旧命名 office-<产品>.img（无法确认语言，按当前选择复用）
             string legacy = Path.Combine(WorkDir, "office-" + prod.Id + ".img");
             if (!File.Exists(img) && File.Exists(legacy) && new FileInfo(legacy).Length > 3L * 1024 * 1024 * 1024)
             {
@@ -938,7 +931,6 @@ namespace O365Installer
                 string setupExe = drive + ":\\setup.exe";
                 if (!File.Exists(setupExe)) throw new CorruptImageException("镜像内未找到 setup.exe");
 
-                // 数据主体必须在，否则说明镜像内容不完整
                 string dataCab = drive + ":\\Office\\Data\\v" + arch + ".cab";
                 if (!File.Exists(dataCab))
                     throw new CorruptImageException("镜像内缺少 Office\\Data\\v" + arch + ".cab");
@@ -1057,7 +1049,6 @@ namespace O365Installer
                 "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        // 等待 Office 即点即用客户端空闲，否则会因执行互斥锁冲突报 997 / 17004
         void WaitForC2RIdle(int timeoutSec, CancellationToken ct)
         {
             DateTime deadline = DateTime.Now.AddSeconds(timeoutSec);
@@ -1099,7 +1090,6 @@ namespace O365Installer
                 rc = await Task.Run(delegate { return RunSetup(setupExe, args, workDir, sw, ct); });
                 Log("安装进程返回码: " + rc + "（第 " + attempt + " 次）");
 
-                // 返回码不可靠: 即使 bootstrapper 报错，安装也可能已经生效
                 string nowVer = GetInstalledVersion();
                 if (!string.IsNullOrEmpty(nowVer))
                 {
@@ -1228,7 +1218,6 @@ namespace O365Installer
             catch { return 0; }
         }
 
-
         void Download(string url, string dest, string metaPath, CancellationToken ct)
         {
             long existing = File.Exists(dest) ? new FileInfo(dest).Length : 0;
@@ -1245,7 +1234,6 @@ namespace O365Installer
             long total = existing + resp.ContentLength;
             Log("服务器返回 " + (int)resp.StatusCode + "，总大小 " + (total / 1024.0 / 1024 / 1024).ToString("F2") + " GB");
 
-            // 记录服务器给出的总大小，下次复用前用它判断完整性
             if (total > 0 && !string.IsNullOrEmpty(metaPath))
             {
                 try { File.WriteAllText(metaPath, total.ToString(), new UTF8Encoding(false)); } catch { }

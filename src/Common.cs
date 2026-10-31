@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -45,7 +45,6 @@ namespace O365Installer
         }
     }
 
-    // 获取微软官方 Office 部署工具（ODT）
     static class OdtTools
     {
         public const string FallbackUrl = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_20430-20146.exe";

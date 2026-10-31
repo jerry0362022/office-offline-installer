@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 namespace O365Installer
 {
-    // 封装的都是微软自带的 OSPP.VBS（Office 软件保护平台），不含任何破解逻辑
+
     static class OfficeLicense
     {
         static string cachedOspp;
@@ -31,7 +31,6 @@ namespace O365Installer
                 if (File.Exists(c)) { cachedOspp = c; return c; }
             }
 
-            // 兜底: 在 Office 安装目录里找一次
             string[] roots = new string[]
             {
                 @"C:\Program Files\Microsoft Office",
@@ -148,7 +147,6 @@ namespace O365Installer
             txtOut.BackColor = Color.FromArgb(252, 252, 253);
             Controls.Add(txtOut);
 
-            // 产品密钥
             GroupBox g1 = new GroupBox();
             g1.Text = "产品密钥";
             g1.Location = new Point(16, 246);
@@ -168,7 +166,6 @@ namespace O365Installer
             btnKey.Click += async delegate { await InstallKey(); };
             g1.Controls.Add(btnKey);
 
-            // KMS
             GroupBox g2 = new GroupBox();
             g2.Text = "KMS 主机（仅限使用你自己的授权服务器）";
             g2.Location = new Point(16, 326);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -14,7 +14,7 @@ namespace O365Installer
 {
     static class OfficeRemover
     {
-        // 即点即用版：从注册表读取产品信息
+
         public static string GetC2RInfo()
         {
             string[] paths = new string[]
@@ -40,7 +40,6 @@ namespace O365Installer
             return null;
         }
 
-        // MSI 版 Office：返回 {名称, ProductCode, 版本}
         public static List<string[]> FindMsiOffice()
         {
             List<string[]> list = new List<string[]>();
