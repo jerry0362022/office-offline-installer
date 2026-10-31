@@ -1,8 +1,8 @@
-﻿param([switch]$CheckOnly)
+﻿param([switch]$CheckOnly, [string]$Out = 'Office离线安装器.exe')
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$outPath = Join-Path $root 'O365安装器.exe'
+$outPath = Join-Path $root $Out
 $tmp = Join-Path $env:TEMP ('o365build_' + [Guid]::NewGuid().ToString('N') + '.exe')
 
 $main = [IO.File]::ReadAllText((Join-Path $root 'src\Installer.cs'), [Text.Encoding]::UTF8)

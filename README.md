@@ -1,6 +1,6 @@
-# Microsoft 365 离线安装器
+# Office 离线安装器
 
-一个 Windows 图形界面的 Office 部署工具，封装微软官方的 Office 部署工具（ODT），支持从微软官方 CDN 安装 Microsoft 365 与历史版本 Office。
+一个 Windows 图形界面的 Office 部署工具，封装微软官方的 Office 部署工具（ODT），支持从微软官方 CDN 安装 Microsoft 365 与历史版本 Office（2016–2024）。
 
 单文件 exe，约 80 KB，不依赖任何运行库（Windows 10/11 自带 .NET Framework 4.x 即可）。
 
@@ -13,7 +13,7 @@
 ## 功能
 
 - **安装 Microsoft 365**：企业应用版 / 商业版 / 家庭版
-- **安装历史版本**：Office 2024 / 2021 / 2019（零售与 LTSC 批量）、Visio、Project、单独应用
+- **安装历史版本**：Office 2016 / 2024 / 2021 / 2019（零售与 LTSC 批量）、Visio、Project、单独应用
 - **两种安装源**
   - 离线镜像（`.img`）：下载微软官方镜像后挂载安装，适合反复部署
   - ODT 在线下载：调用 `setup.exe /download` 拉取到本地目录，支持任意产品
@@ -30,7 +30,7 @@
 
 ## 使用方法
 
-1. 下载 [Releases](../../releases) 中的 `O365-Installer.exe`
+1. 下载 [Releases](../../releases) 中的 `Office-Installer.exe`
 2. 双击运行，UAC 允许后阅读并同意免责声明
 3. 选择产品、语言、位数与需要的组件
 4. 点「开始安装」
@@ -47,7 +47,7 @@
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
-输出 `O365安装器.exe`。`build.ps1 -CheckOnly` 只做编译校验，不覆盖已有 exe。
+输出 `Office离线安装器.exe`。`build.ps1 -CheckOnly` 只做编译校验，不覆盖已有 exe。
 
 源码结构：
 

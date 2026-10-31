@@ -16,8 +16,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyVersion("1.0.2.0")]
-[assembly: AssemblyFileVersion("1.0.2.0")]
+[assembly: AssemblyVersion("1.0.3.0")]
+[assembly: AssemblyFileVersion("1.0.3.0")]
 
 namespace O365Installer
 {
@@ -87,6 +87,17 @@ namespace O365Installer
             Application.SetCompatibleTextRenderingDefault(false);
 
             bool uiTest = args.Length > 0 && args[0] == "--uitest";
+            if (uiTest && args.Length > 1 && args[1] == "lic")
+            {
+                LicenseForm.UiTestShot = true;
+                Application.Run(new LicenseForm());
+                return;
+            }
+            if (uiTest && args.Length > 1)
+            {
+                int idx;
+                if (int.TryParse(args[1], out idx)) MainForm.UiTestProductIndex = idx;
+            }
 
             if (!IsAdmin() && !uiTest)
             {
@@ -100,7 +111,7 @@ namespace O365Installer
                 }
                 catch
                 {
-                    MessageBox.Show("需要管理员权限才能安装 Office，请在弹窗中点击\"是\"。", "Microsoft 365 安装器",
+                    MessageBox.Show("需要管理员权限才能安装 Office，请在弹窗中点击\"是\"。", "Office 安装器",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
                 return;
@@ -112,7 +123,7 @@ namespace O365Installer
             Mutex single = new Mutex(true, "Global\\O365Installer_SingleRun", out createdNew);
             if (!createdNew && !uiTest2)
             {
-                MessageBox.Show("安装器已经在运行，请勿重复打开。", "Microsoft 365 安装器",
+                MessageBox.Show("安装器已经在运行，请勿重复打开。", "Office 安装器",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -288,6 +299,7 @@ namespace O365Installer
         bool busy;
         bool applying;
         List<ProductDef> catalog = Catalog.All();
+        internal static int UiTestProductIndex = -1;
 
         public MainForm(bool uiTest)
         {
@@ -301,12 +313,12 @@ namespace O365Installer
                 {
                     try
                     {
-                        Rectangle vs = SystemInformation.VirtualScreen;
-                        Bitmap b = new Bitmap(vs.Width, vs.Height);
-                        using (Graphics g = Graphics.FromImage(b))
-                        {
-                            g.CopyFromScreen(vs.Location, new Point(0, 0), vs.Size);
-                        }
+                        Activate();
+                        TopMost = true;
+                        Application.DoEvents();
+                        Rectangle r = new Rectangle(0, 0, ClientSize.Width, ClientSize.Height);
+                        Bitmap b = new Bitmap(r.Width, r.Height);
+                        DrawToBitmap(b, r);
                         b.Save(Path.Combine(Path.GetTempPath(), "o365exe_ui.png"), ImageFormat.Png);
                         b.Dispose();
                     }
@@ -321,7 +333,7 @@ namespace O365Installer
         void BuildUi()
         {
             Font f = new Font("Microsoft YaHei UI", 9F);
-            Text = "Microsoft 365 离线安装器";
+            Text = "Office 离线安装器";
             ClientSize = new Size(744, 606);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -330,14 +342,14 @@ namespace O365Installer
             BackColor = Color.FromArgb(248, 249, 251);
 
             Label title = new Label();
-            title.Text = "Microsoft 365 离线安装器";
+            title.Text = "Office 离线安装器";
             title.Font = new Font("Microsoft YaHei UI", 15F, FontStyle.Bold);
             title.Location = new Point(16, 12);
             title.AutoSize = true;
             Controls.Add(title);
 
             Label sub = new Label();
-            sub.Text = "从官方离线镜像安装，全程自动，无需联网下载安装文件";
+            sub.Text = "Office 2016–2024 与 Microsoft 365，支持官方离线镜像和 ODT 在线下载";
             sub.ForeColor = Color.FromArgb(120, 125, 135);
             sub.Location = new Point(18, 42);
             sub.AutoSize = true;
@@ -358,6 +370,7 @@ namespace O365Installer
             cbProduct.MaxDropDownItems = 20;
             foreach (ProductDef p in catalog) cbProduct.Items.Add(p.Name);
             cbProduct.SelectedIndex = 0;
+            if (UiTestProductIndex >= 0 && UiTestProductIndex < catalog.Count) cbProduct.SelectedIndex = UiTestProductIndex;
             g1.Controls.Add(cbProduct);
 
             AddLabel(g1, "语言", 14, 66);
@@ -434,13 +447,14 @@ namespace O365Installer
             lblSourcePath.ForeColor = Color.FromArgb(120, 125, 135);
             lblSourcePath.Font = new Font("Microsoft YaHei UI", 8F);
             lblSourcePath.Location = new Point(14, 52);
-            lblSourcePath.Size = new Size(336, 62);
+            lblSourcePath.Size = new Size(336, 48);
+            lblSourcePath.AutoEllipsis = true;
             lblSourcePath.Visible = false;
             g2.Controls.Add(lblSourcePath);
 
             chkKeep = new CheckBox();
             chkKeep.Text = "完成后保留安装源（便于给其他电脑用）";
-            chkKeep.Location = new Point(14, 104);
+            chkKeep.Location = new Point(14, 102);
             chkKeep.AutoSize = true;
             g2.Controls.Add(chkKeep);
 
@@ -448,7 +462,7 @@ namespace O365Installer
             l5.Text = "临时文件: " + WorkDir;
             l5.ForeColor = Color.FromArgb(120, 125, 135);
             l5.Font = new Font("Microsoft YaHei UI", 8F);
-            l5.Location = new Point(14, 136);
+            l5.Location = new Point(14, 141);
             l5.Size = new Size(336, 18);
             l5.AutoEllipsis = true;
             g2.Controls.Add(l5);
@@ -647,6 +661,9 @@ namespace O365Installer
             lblUrl.Visible = useImg;
             tbUrl.Visible = useImg;
             lblSourcePath.Visible = !useImg;
+            chkKeep.Text = useImg
+                ? "完成后保留镜像文件（可重复使用）"
+                : "完成后保留下载的安装文件（可重复使用）";
 
             lblHint.ForeColor = HintColor();
             lblHint.Text = HintText();
