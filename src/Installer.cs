@@ -176,7 +176,6 @@ namespace O365Installer
         static readonly string LogDir = Path.Combine(WorkDir, "logs");
         static readonly string[] AppNames = new string[] { "Word", "Excel", "PowerPoint", "Outlook", "OneNote", "Teams", "OneDrive", "Access", "Publisher" };
 
-        const string OdtFallbackUrl = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_20430-20146.exe";
 
         static readonly Dictionary<string, string> LangNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -993,7 +992,8 @@ namespace O365Installer
 
             Report(8, "准备部署工具...");
             Log("正在获取微软官方 Office 部署工具 (ODT)");
-            string setupExe = await Task.Run(delegate { return EnsureOdt(odtDir, ct); });
+            Action<string> odtLog = new Action<string>(Log);
+            string setupExe = await Task.Run(delegate { return OdtTools.Ensure(odtDir, odtLog, ct); });
             Log("部署工具就绪: " + setupExe, Color.FromArgb(0, 130, 60));
 
             Report(15, "下载安装文件...");
@@ -1102,74 +1102,6 @@ namespace O365Installer
                 await Task.Delay(30000, ct);
             }
             return rc;
-        }
-
-        static string HttpGet(string url)
-        {
-            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-            req.Timeout = 60000;
-            req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
-            req.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
-            using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
-            using (StreamReader sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-            {
-                return sr.ReadToEnd();
-            }
-        }
-
-        string EnsureOdt(string dir, CancellationToken ct)
-        {            string setup = Path.Combine(dir, "setup.exe");
-            if (File.Exists(setup)) return setup;
-
-            Directory.CreateDirectory(dir);
-            string odtExe = Path.Combine(WorkDir, "odt.exe");
-
-            if (!File.Exists(odtExe) || new FileInfo(odtExe).Length < 500000)
-            {
-                string url = null;
-                try
-                {
-                    string page = HttpGet("https://www.microsoft.com/zh-cn/download/details.aspx?id=49117");
-                    Match m = Regex.Match(page, @"https://download\.microsoft\.com/download/[0-9a-fA-F\-]+/officedeploymenttool_[0-9\-]+\.exe");
-                    if (m.Success) url = m.Value;
-                }
-                catch { }
-                if (string.IsNullOrEmpty(url)) url = OdtFallbackUrl;
-                Log("ODT 下载地址: " + url);
-                DownloadFile(url, odtExe, ct);
-                Log("ODT 下载完成: " + (new FileInfo(odtExe).Length / 1024) + " KB");
-            }
-
-            ProcessStartInfo psi = new ProcessStartInfo(odtExe);
-            psi.Arguments = "/extract:\"" + dir + "\" /quiet";
-            psi.UseShellExecute = false;
-            psi.CreateNoWindow = true;
-            using (Process p = Process.Start(psi)) p.WaitForExit(180000);
-
-            for (int i = 0; i < 20 && !File.Exists(setup); i++) Thread.Sleep(500);
-            if (!File.Exists(setup)) throw new Exception("ODT 解压失败，可能是安全软件拦截了部署工具。");
-            return setup;
-        }
-
-        void DownloadFile(string url, string dest, CancellationToken ct)
-        {
-            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-            req.Timeout = 60000;
-            req.ReadWriteTimeout = 60000;
-            req.UserAgent = "Mozilla/5.0";
-            using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
-            using (Stream st = resp.GetResponseStream())
-            using (FileStream fs = new FileStream(dest, FileMode.Create, FileAccess.Write))
-            {
-                byte[] buf = new byte[65536];
-                while (true)
-                {
-                    if (ct.IsCancellationRequested) ct.ThrowIfCancellationRequested();
-                    int n = st.Read(buf, 0, buf.Length);
-                    if (n <= 0) break;
-                    fs.Write(buf, 0, n);
-                }
-            }
         }
 
         int RunOdtDownload(string setupExe, string cfgPath, string srcDir, Stopwatch sw, CancellationToken ct)
