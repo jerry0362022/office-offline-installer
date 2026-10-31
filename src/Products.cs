@@ -50,6 +50,10 @@ namespace O365Installer
             A(l, "O365ProPlusEEANoTeamsRetail", "Microsoft 365 企业应用版（不含 Teams）", "Microsoft 365", "Current");
             A(l, "O365BusinessEEANoTeamsRetail", "Microsoft 365 商业版（不含 Teams）", "Microsoft 365", "Current");
 
+            A(l, "ProPlusRetail", "Office 专业增强版 2016", "Office 2016", "Current");
+            A(l, "ProPlusVolume", "Office 专业增强版 2016（批量授权）", "Office 2016", "PerpetualVL2016");
+            A(l, "ProfessionalRetail", "Office 小型企业版 2016", "Office 2016", "Current");
+
             string[] years = new string[] { "2024", "2021", "2019" };
             foreach (string y in years)
             {

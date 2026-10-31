@@ -382,8 +382,8 @@ namespace O365Installer
             lblHint = new Label();
             lblHint.ForeColor = Color.FromArgb(150, 120, 40);
             lblHint.Font = new Font("Microsoft YaHei UI", 8F);
-            lblHint.Location = new Point(14, 98);
-            lblHint.Size = new Size(306, 44);
+            lblHint.Location = new Point(14, 96);
+            lblHint.Size = new Size(312, 64);
             lblHint.Text = HintText();
             g1.Controls.Add(lblHint);
 
@@ -434,7 +434,7 @@ namespace O365Installer
             lblSourcePath.ForeColor = Color.FromArgb(120, 125, 135);
             lblSourcePath.Font = new Font("Microsoft YaHei UI", 8F);
             lblSourcePath.Location = new Point(14, 52);
-            lblSourcePath.Size = new Size(336, 44);
+            lblSourcePath.Size = new Size(336, 62);
             lblSourcePath.Visible = false;
             g2.Controls.Add(lblSourcePath);
 
@@ -606,8 +606,19 @@ namespace O365Installer
         {
             ProductDef p = SelectedProduct;
             if (p == null) return "";
-            return "产品 ID: " + p.Id + "    更新通道: " + p.Channel + Environment.NewLine
-                + (p.Img ? "该产品有微软官方离线镜像，可选镜像或 ODT 下载。" : "该产品仅支持 ODT 在线下载。");
+            string head = "产品 ID: " + p.Id + "    更新通道: " + p.Channel + Environment.NewLine;
+            if (p.Img)
+                return head + "该产品有微软官方离线镜像，可选镜像或 ODT 下载。";
+
+            string line2 = "该产品无官方离线镜像，只能 ODT 在线下载。";
+            if (p.Family == "Office 2016") line2 = "该产品无官方离线镜像，只能 ODT 在线下载（2016 为实验性支持）。";
+            return head + line2;
+        }
+
+        Color HintColor()
+        {
+            ProductDef p = SelectedProduct;
+            return (p != null && !p.Img) ? Color.FromArgb(190, 40, 40) : Color.FromArgb(150, 120, 40);
         }
 
         ProductDef SelectedProduct
@@ -636,6 +647,16 @@ namespace O365Installer
             lblUrl.Visible = useImg;
             tbUrl.Visible = useImg;
             lblSourcePath.Visible = !useImg;
+
+            lblHint.ForeColor = HintColor();
+            lblHint.Text = HintText();
+            if (!useImg)
+            {
+                string tip = "安装源将下载到:\n" + Path.Combine(WorkDir, "source");
+                if (p != null && p.Family == "Office 2016")
+                    tip += "\n（2016 无离线镜像，必须联网下载）";
+                lblSourcePath.Text = tip;
+            }
 
             bool multi = p != null && !p.SingleApp;
             foreach (CheckBox c in checks.Values) c.Enabled = multi && !busy;
