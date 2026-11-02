@@ -140,6 +140,7 @@ namespace O365Installer
         public UninstallForm()
         {
             BuildUi();
+            Theme.Apply(this);
             RefreshList();
         }
 
@@ -153,7 +154,7 @@ namespace O365Installer
             MinimizeBox = false;
             ShowInTaskbar = false;
             Font = new Font("Microsoft YaHei UI", 9F);
-            BackColor = Color.FromArgb(248, 249, 251);
+            BackColor = Theme.Bg;
 
             lblC2R = new Label();
             lblC2R.Text = L.T("即点即用版：检测中...");

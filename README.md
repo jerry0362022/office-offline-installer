@@ -6,9 +6,13 @@
 
 ## 界面
 
-> 截图可自行放到 `docs/screenshot.png` 后在此引用
+![浅色主题](docs/screenshot-light.png)
+
+![深色主题](docs/screenshot-dark.png)
 
 主界面：产品 / 语言 / 位数选择，组件勾选，安装源（离线镜像或 ODT 下载），进度与实时日志。
+
+卡片式分组，右上角可切换语言与明暗主题，选择会被记住（`%LOCALAPPDATA%\OfficeOfflineInstaller\`）。
 
 ## 界面语言
 

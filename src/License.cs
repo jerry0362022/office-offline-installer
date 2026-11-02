@@ -303,7 +303,7 @@ namespace O365Installer
             MinimizeBox = false;
             ShowInTaskbar = false;
             Font = new Font("Microsoft YaHei UI", 9F);
-            BackColor = Color.FromArgb(248, 249, 251);
+            BackColor = Theme.Bg;
 
             lblSummary = new Label();
             lblSummary.Text = L.T("正在读取授权状态...");
@@ -449,6 +449,7 @@ namespace O365Installer
             btnClose.Size = new Size(90, 32);
             btnClose.DialogResult = DialogResult.OK;
             Controls.Add(btnClose);
+            Theme.Apply(this);
         }
 
         void SetBusy(bool b)

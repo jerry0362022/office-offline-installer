@@ -32,7 +32,7 @@ namespace O365Installer
             MinimizeBox = false;
             ShowInTaskbar = consent;
             Font = new Font("Microsoft YaHei UI", 9F);
-            BackColor = Color.FromArgb(248, 249, 251);
+            BackColor = Theme.Bg;
 
             TextBox tb = new TextBox();
             tb.Multiline = true;
@@ -85,6 +85,7 @@ namespace O365Installer
                 Controls.Add(close);
                 AcceptButton = close;
             }
+            Theme.Apply(this);
         }
 
         public static bool Ask()

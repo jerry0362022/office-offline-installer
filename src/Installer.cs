@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
@@ -16,8 +17,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyVersion("1.1.2.0")]
-[assembly: AssemblyFileVersion("1.1.2.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 
 namespace O365Installer
 {
@@ -86,6 +87,7 @@ namespace O365Installer
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
+            Theme.Load();
             bool uiTest = args.Length > 0 && args[0] == "--uitest";
             if (uiTest && args.Length > 1 && args[1] == "lic")
             {
@@ -303,6 +305,14 @@ namespace O365Installer
             return name + "  (" + code + ")";
         }
 
+        void ToggleTheme()
+        {
+            Theme.Toggle();
+            Theme.Apply(this);
+            btnTheme.Text = Theme.Dark ? "\u2600" : "\u263E";
+            ActiveControl = null;
+        }
+
         void OnUiLangChanged()
         {
             if (applying || cbUiLang == null) return;
@@ -339,9 +349,10 @@ namespace O365Installer
         CheckBox chkKeep;
         RadioButton rbImg, rbOdt;
         Label lblHint, lblStatus, lblUrl, lblSourcePath;
-        ProgressBar bar;
+        FlatProgress bar;
         RichTextBox log;
-        Button btnStart, btnCancel, btnLog;
+        CardPanel logWrap;
+        FlatButton btnStart, btnCancel, btnLog, btnTheme;
         Dictionary<string, CheckBox> checks = new Dictionary<string, CheckBox>();
         CancellationTokenSource cts;
         bool busy;
@@ -388,7 +399,7 @@ namespace O365Installer
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             Font = f;
-            BackColor = Color.FromArgb(248, 249, 251);
+            BackColor = Theme.Bg;
 
             Label title = new Label();
             title.Text = L.T("Office 离线安装器");
@@ -402,25 +413,34 @@ namespace O365Installer
             sub.ForeColor = Color.FromArgb(120, 125, 135);
             sub.Location = new Point(18, 42);
             sub.AutoSize = true;
+            sub.Tag = "sub";
             Controls.Add(sub);
 
-            cbUiLang = new ComboBox();
+            cbUiLang = new FlatCombo();
             cbUiLang.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbUiLang.Location = new Point(596, 16);
-            cbUiLang.Size = new Size(132, 24);
+            cbUiLang.Location = new Point(548, 14);
+            cbUiLang.Size = new Size(116, 24);
             for (int i = 0; i < L.NativeNames.Length; i++) cbUiLang.Items.Add(L.NativeNames[i]);
             cbUiLang.SelectedIndex = L.Index;
             cbUiLang.SelectedIndexChanged += delegate { OnUiLangChanged(); };
             Controls.Add(cbUiLang);
 
-            GroupBox g1 = new GroupBox();
+            btnTheme = new FlatButton();
+            btnTheme.Location = new Point(672, 14);
+            btnTheme.Size = new Size(56, 28);
+            btnTheme.Font = Theme.UiFont(12F, FontStyle.Regular);
+            btnTheme.Text = Theme.Dark ? "\u2600" : "\u263E";
+            btnTheme.Click += delegate { ToggleTheme(); };
+            Controls.Add(btnTheme);
+
+            CardGroup g1 = new CardGroup();
             g1.Text = L.T("安装选项");
             g1.Location = new Point(16, 68);
             g1.Size = new Size(336, 168);
             Controls.Add(g1);
 
             AddLabel(g1, L.T("产品"), 14, 30);
-            cbProduct = new ComboBox();
+            cbProduct = new FlatCombo();
             cbProduct.DropDownStyle = ComboBoxStyle.DropDownList;
             cbProduct.Location = new Point(72, 26);
             cbProduct.Size = new Size(246, 24);
@@ -432,18 +452,18 @@ namespace O365Installer
             g1.Controls.Add(cbProduct);
 
             AddLabel(g1, L.T("语言"), 14, 66);
-            cbLang = new ComboBox();
+            cbLang = new FlatCombo();
             cbLang.DropDownStyle = ComboBoxStyle.DropDownList;
             cbLang.Location = new Point(84, 62);
-            cbLang.Size = new Size(160, 24);
+            cbLang.Size = new Size(140, 24);
             cbLang.DropDownWidth = 240;
             g1.Controls.Add(cbLang);
             FillLanguages();
 
-            AddLabel(g1, L.T("位数"), 220, 66);
-            cbArch = new ComboBox();
+            AddLabel(g1, L.T("位数"), 232, 66);
+            cbArch = new FlatCombo();
             cbArch.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbArch.Location = new Point(258, 62);
+            cbArch.Location = new Point(268, 62);
             cbArch.Size = new Size(60, 24);
             cbArch.Items.Add("64");
             cbArch.Items.Add("32");
@@ -451,7 +471,7 @@ namespace O365Installer
             g1.Controls.Add(cbArch);
 
             lblHint = new Label();
-            lblHint.ForeColor = Color.FromArgb(150, 120, 40);
+            lblHint.Tag = "warn";
             lblHint.Font = new Font("Microsoft YaHei UI", 8F);
             lblHint.Location = new Point(14, 96);
             lblHint.Size = new Size(312, 64);
@@ -469,7 +489,7 @@ namespace O365Installer
             };
             cbLang.SelectedIndexChanged += delegate { if (!applying) AutoFillUrl(); };
 
-            GroupBox g2 = new GroupBox();
+            CardGroup g2 = new CardGroup();
             g2.Text = L.T("安装源");
             g2.Location = new Point(364, 68);
             g2.Size = new Size(364, 168);
@@ -498,11 +518,13 @@ namespace O365Installer
             tbUrl.Location = new Point(14, 70);
             tbUrl.Size = new Size(336, 24);
             tbUrl.Text = DefaultUrl;
+            tbUrl.BackColor = Theme.Field;
+            tbUrl.ForeColor = Theme.Text;
             g2.Controls.Add(tbUrl);
 
             lblSourcePath = new Label();
             lblSourcePath.Text = L.T("安装源将下载到: ") + Path.Combine(WorkDir, "source");
-            lblSourcePath.ForeColor = Color.FromArgb(120, 125, 135);
+            lblSourcePath.Tag = "sub";
             lblSourcePath.Font = new Font("Microsoft YaHei UI", 8F);
             lblSourcePath.Location = new Point(14, 52);
             lblSourcePath.Size = new Size(336, 48);
@@ -518,7 +540,7 @@ namespace O365Installer
 
             Label l5 = new Label();
             l5.Text = L.T("临时文件: ") + WorkDir;
-            l5.ForeColor = Color.FromArgb(120, 125, 135);
+            l5.Tag = "sub";
             l5.Font = new Font("Microsoft YaHei UI", 8F);
             l5.Location = new Point(14, 141);
             l5.Size = new Size(336, 18);
@@ -529,7 +551,7 @@ namespace O365Installer
             rbOdt.CheckedChanged += delegate { if (!applying) ToggleMode(); };
             ToggleMode();
 
-            GroupBox g3 = new GroupBox();
+            CardGroup g3 = new CardGroup();
             g3.Text = L.T("要安装的组件（取消勾选 = 不安装）");
             g3.Location = new Point(16, 246);
             g3.Size = new Size(712, 96);
@@ -550,9 +572,9 @@ namespace O365Installer
                 checks[AppNames[i]] = c;
             }
 
-            bar = new ProgressBar();
-            bar.Location = new Point(16, 354);
-            bar.Size = new Size(712, 14);
+            bar = new FlatProgress();
+            bar.Location = new Point(16, 356);
+            bar.Size = new Size(712, 10);
             bar.Maximum = 100;
             Controls.Add(bar);
 
@@ -563,28 +585,28 @@ namespace O365Installer
             lblStatus.ForeColor = Color.FromArgb(80, 85, 95);
             Controls.Add(lblStatus);
 
+            logWrap = new CardPanel();
+            logWrap.Location = new Point(16, 394);
+            logWrap.Size = new Size(712, 152);
+            logWrap.Padding = new Padding(12, 10, 8, 10);
+            Controls.Add(logWrap);
+
             log = new RichTextBox();
-            log.Location = new Point(16, 396);
-            log.Size = new Size(712, 148);
+            log.Dock = DockStyle.Fill;
             log.ReadOnly = true;
-            log.BackColor = Color.FromArgb(252, 252, 253);
-            log.BorderStyle = BorderStyle.FixedSingle;
             log.Font = new Font("Consolas", 9F);
             log.ScrollBars = RichTextBoxScrollBars.Vertical;
-            Controls.Add(log);
+            logWrap.Controls.Add(log);
 
-            btnStart = new Button();
+            btnStart = new FlatButton();
+            btnStart.Primary = true;
             btnStart.Text = L.T("开始安装");
             btnStart.Location = new Point(534, 556);
             btnStart.Size = new Size(104, 34);
-            btnStart.BackColor = Color.FromArgb(0, 120, 212);
-            btnStart.ForeColor = Color.White;
-            btnStart.FlatStyle = FlatStyle.Flat;
-            btnStart.FlatAppearance.BorderSize = 0;
             btnStart.Click += OnStartClick;
             Controls.Add(btnStart);
 
-            btnCancel = new Button();
+            btnCancel = new FlatButton();
             btnCancel.Text = L.T("取消");
             btnCancel.Location = new Point(646, 556);
             btnCancel.Size = new Size(82, 34);
@@ -596,7 +618,7 @@ namespace O365Installer
             };
             Controls.Add(btnCancel);
 
-            btnLog = new Button();
+            btnLog = new FlatButton();
             btnLog.Text = L.T("打开日志目录");
             btnLog.Location = new Point(16, 556);
             btnLog.Size = new Size(116, 34);
@@ -607,7 +629,7 @@ namespace O365Installer
             };
             Controls.Add(btnLog);
 
-            Button btnLicense = new Button();
+            FlatButton btnLicense = new FlatButton();
             btnLicense.Text = L.T("授权管理");
             btnLicense.Location = new Point(140, 556);
             btnLicense.Size = new Size(116, 34);
@@ -620,7 +642,7 @@ namespace O365Installer
             };
             Controls.Add(btnLicense);
 
-            Button btnUninstall = new Button();
+            FlatButton btnUninstall = new FlatButton();
             btnUninstall.Text = L.T("卸载旧版");
             btnUninstall.Location = new Point(264, 556);
             btnUninstall.Size = new Size(126, 34);
@@ -633,7 +655,7 @@ namespace O365Installer
             };
             Controls.Add(btnUninstall);
 
-            Button btnAbout = new Button();
+            FlatButton btnAbout = new FlatButton();
             btnAbout.Text = L.T("声明");
             btnAbout.Location = new Point(398, 556);
             btnAbout.Size = new Size(90, 34);
@@ -644,17 +666,20 @@ namespace O365Installer
             Controls.Add(btnAbout);
 
             if (UiTestSwitchLang >= 0 && UiTestSwitchLang <= 3) cbUiLang.SelectedIndex = UiTestSwitchLang;
+            Theme.Apply(this);
+            btnTheme.Text = Theme.Dark ? "\u2600" : "\u263E";
+            ActiveControl = null;
 
             int avail = Screen.PrimaryScreen.WorkingArea.Height;
             int over = Height - avail + 6;
             if (over > 0)
             {
-                int newLogH = log.Height - over;
-                if (newLogH < 72) newLogH = 72;
-                int shift = log.Height - newLogH;
+                int newLogH = logWrap.Height - over;
+                if (newLogH < 82) newLogH = 82;
+                int shift = logWrap.Height - newLogH;
                 if (shift > 0)
                 {
-                    log.Height = newLogH;
+                    logWrap.Height = newLogH;
                     btnStart.Top -= shift;
                     btnCancel.Top -= shift;
                     btnLog.Top -= shift;
