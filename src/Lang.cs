@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
@@ -99,7 +99,7 @@ namespace O365Installer
             revAll = new Dictionary<string, string>();
             foreach (KeyValuePair<string, string[]> kv in map)
             {
-                for (int i = 1; i < 4; i++)
+                for (int i = 0; i < 4; i++)
                 {
                     string s = kv.Value[i];
                     if (!string.IsNullOrEmpty(s) && !revAll.ContainsKey(s)) revAll[s] = kv.Key;
@@ -109,7 +109,6 @@ namespace O365Installer
 
         public static void Apply(Control root)
         {
-            if (idx == 0) return;
             if (revAll == null) BuildRev();
             ApplyText(root);
             foreach (Control c in root.Controls)

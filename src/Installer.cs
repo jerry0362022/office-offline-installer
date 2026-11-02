@@ -16,8 +16,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.1.1.0")]
+[assembly: AssemblyFileVersion("1.1.1.0")]
 
 namespace O365Installer
 {
@@ -97,6 +97,8 @@ namespace O365Installer
             {
                 int idx;
                 if (int.TryParse(args[1], out idx)) MainForm.UiTestProductIndex = idx;
+                int sw;
+                if (args.Length > 2 && int.TryParse(args[2], out sw)) MainForm.UiTestSwitchLang = sw;
             }
 
             if (!IsAdmin() && !uiTest)
@@ -293,7 +295,8 @@ namespace O365Installer
             cbLang.SelectedIndex = lang;
             applying = false;
 
-            foreach (Form fm in Application.OpenForms) L.Apply(fm);
+            L.Apply(this);
+            foreach (Form fm in Application.OpenForms) if (fm != this) L.Apply(fm);
             if (lblHint != null) lblHint.Text = HintText();
             if (lblSourcePath != null) lblSourcePath.Text = L.T("安装源将下载到:\n") + Path.Combine(WorkDir, "source");
             ToggleMode();
@@ -321,6 +324,7 @@ namespace O365Installer
         bool applying;
         List<ProductDef> catalog = Catalog.All();
         internal static int UiTestProductIndex = -1;
+        internal static int UiTestSwitchLang = -1;
 
         public MainForm(bool uiTest)
         {
@@ -394,8 +398,8 @@ namespace O365Installer
             AddLabel(g1, L.T("产品"), 14, 30);
             cbProduct = new ComboBox();
             cbProduct.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbProduct.Location = new Point(60, 26);
-            cbProduct.Size = new Size(258, 24);
+            cbProduct.Location = new Point(72, 26);
+            cbProduct.Size = new Size(246, 24);
             cbProduct.DropDownWidth = 340;
             cbProduct.MaxDropDownItems = 20;
             foreach (ProductDef p in catalog) cbProduct.Items.Add(L.T(p.Name));
@@ -406,8 +410,8 @@ namespace O365Installer
             AddLabel(g1, L.T("语言"), 14, 66);
             cbLang = new ComboBox();
             cbLang.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbLang.Location = new Point(76, 62);
-            cbLang.Size = new Size(134, 24);
+            cbLang.Location = new Point(84, 62);
+            cbLang.Size = new Size(160, 24);
             cbLang.DropDownWidth = 240;
             g1.Controls.Add(cbLang);
             FillLanguages();
@@ -614,6 +618,8 @@ namespace O365Installer
                 using (ConsentForm cf = new ConsentForm(false)) cf.ShowDialog(this);
             };
             Controls.Add(btnAbout);
+
+            if (UiTestSwitchLang >= 0 && UiTestSwitchLang <= 3) cbUiLang.SelectedIndex = UiTestSwitchLang;
 
             int avail = Screen.PrimaryScreen.WorkingArea.Height;
             int over = Height - avail + 6;
