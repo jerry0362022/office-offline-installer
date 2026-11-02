@@ -212,6 +212,14 @@ namespace O365Installer
             Invalidate();
         }
 
+        public void SetText(int index, string text)
+        {
+            if (index < 0 || index >= Items.Count) return;
+            if (string.IsNullOrEmpty(text) || Items[index].Text == text) return;
+            Items[index].Text = text;
+            Invalidate();
+        }
+
         int Top0 { get { return 92; } }
         int ItemH { get { return 44; } }
 
@@ -445,9 +453,77 @@ namespace O365Installer
 
     class CardGroup : GroupBox
     {
+        public const int HeaderHeight = 40;
+
+        bool collapsed;
+        bool allowCollapse;
+        int expanded;
+
+        public event EventHandler CollapsedChanged;
+
         public CardGroup()
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        }
+
+        public bool AllowCollapse
+        {
+            get { return allowCollapse; }
+            set
+            {
+                if (allowCollapse == value) return;
+                allowCollapse = value;
+                if (!allowCollapse && collapsed) Collapsed = false;
+                Invalidate();
+            }
+        }
+
+        public int ExpandedHeight
+        {
+            get { return expanded > HeaderHeight ? expanded : Height; }
+            set { if (value > HeaderHeight) expanded = value; }
+        }
+
+        public bool Collapsed
+        {
+            get { return collapsed; }
+            set
+            {
+                if (collapsed == value) return;
+                if (!collapsed && expanded <= HeaderHeight && Height > HeaderHeight) expanded = Height;
+                collapsed = value;
+                ApplyCollapse();
+                Invalidate();
+                if (CollapsedChanged != null) CollapsedChanged(this, EventArgs.Empty);
+            }
+        }
+
+        void ApplyCollapse()
+        {
+            foreach (Control c in Controls) c.Visible = !collapsed;
+            Height = collapsed ? HeaderHeight : (expanded > HeaderHeight ? expanded : HeaderHeight);
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            if (allowCollapse) Cursor = e.Y <= HeaderHeight ? Cursors.Hand : Cursors.Default;
+            base.OnMouseMove(e);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            if (allowCollapse) Cursor = Cursors.Default;
+            base.OnMouseLeave(e);
+        }
+
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            if (allowCollapse && e.Button == MouseButtons.Left && e.Y <= HeaderHeight)
+            {
+                Collapsed = !collapsed;
+                return;
+            }
+            base.OnMouseClick(e);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -467,6 +543,33 @@ namespace O365Installer
 
             TextRenderer.DrawText(g, Text, new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
                 new Point(14, 9), Theme.Text, TextFormatFlags.NoPadding);
+
+            if (!allowCollapse) return;
+
+            int ax = Width - 26;
+            int ay = 17;
+            Point[] arrow;
+            if (collapsed)
+            {
+                arrow = new Point[] {
+                    new Point(ax - 3, ay - 5),
+                    new Point(ax + 2, ay),
+                    new Point(ax - 3, ay + 5) };
+            }
+            else
+            {
+                arrow = new Point[] {
+                    new Point(ax - 5, ay - 3),
+                    new Point(ax, ay + 2),
+                    new Point(ax + 5, ay - 3) };
+            }
+            using (Pen ap = new Pen(Theme.SubText, 1.6f))
+            {
+                ap.StartCap = LineCap.Round;
+                ap.EndCap = LineCap.Round;
+                ap.LineJoin = LineJoin.Round;
+                g.DrawLines(ap, arrow);
+            }
         }
     }
 

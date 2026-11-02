@@ -320,6 +320,26 @@ namespace O365Installer
             En("同意后方可使用本程序；不同意将直接退出", "You must accept to use this program; declining exits");
             En("同意并继续", "Accept and continue");
             En("不同意，退出", "Decline and exit");
+
+            // 侧边栏与分页界面（重构后新增）
+            En("安装", "Installation");
+            En("产品与语言", "Product and language");
+            En("进度与日志", "Progress and log");
+            En("设置", "Settings");
+            En("关于", "About");
+            En("界面", "Interface");
+            En("界面语言", "Interface language");
+            En("主题", "Theme");
+            En("维护", "Maintenance");
+            En("查看免责声明", "View disclaimer");
+            En("浅色", "Light");
+            En("深色", "Dark");
+            En("选择产品与安装源，安装过程可随时取消", "Pick a product and source; cancel anytime");
+            En("查询授权状态、安装密钥、配置 KMS 主机", "Check license status, install a key, set the KMS host");
+            En("清理残留的即点即用版或 MSI 版 Office", "Remove leftover Click-to-Run or MSI Office");
+            En("界面语言与外观", "Language and appearance");
+            En("封装微软官方 ODT，安装源来自 officecdn.microsoft.com，不提供任何激活绕过。", "Wraps the official Microsoft ODT. Sources come from officecdn.microsoft.com; no activation bypass is provided.");
+            En("MIT 许可 · 与微软公司无隶属或背书关系", "MIT licensed · Not affiliated with or endorsed by Microsoft");
             EnConsent();
         }
 

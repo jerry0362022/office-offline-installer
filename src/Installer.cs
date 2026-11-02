@@ -17,8 +17,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyVersion("1.3.1.0")]
-[assembly: AssemblyFileVersion("1.3.1.0")]
+[assembly: AssemblyVersion("1.4.0.0")]
+[assembly: AssemblyFileVersion("1.4.0.0")]
 
 namespace O365Installer
 {
@@ -127,6 +127,7 @@ namespace O365Installer
                 if (args.Length > 2 && int.TryParse(args[2], out sw)) MainForm.UiTestSwitchLang = sw;
                 int pg;
                 if (args.Length > 3 && int.TryParse(args[3], out pg)) MainForm.UiTestPage = pg;
+                if (args.Length > 4 && args[4] == "collapse") MainForm.UiTestCollapse = true;
             }
 
             if (!IsAdmin() && !uiTest)
@@ -362,8 +363,12 @@ namespace O365Installer
 
             L.Apply(this);
             foreach (Form fm in Application.OpenForms) if (fm != this) L.Apply(fm);
+            SyncNavTexts();
+            SyncHeaderTexts();
+            UpdateThemeButton();
             if (lblHint != null) lblHint.Text = HintText();
-            if (lblSourcePath != null) lblSourcePath.Text = L.T("安装源将下载到:\n") + Path.Combine(WorkDir, "source");
+            if (lblSourcePath != null) lblSourcePath.Text = L.T("安装源将下载到: ") + Path.Combine(WorkDir, "source");
+            if (lblTemp != null) lblTemp.Text = L.T("临时文件: ") + WorkDir;
             ToggleMode();
         }
 
@@ -379,12 +384,12 @@ namespace O365Installer
         TextBox tbUrl;
         CheckBox chkKeep;
         RadioButton rbImg, rbOdt;
-        Label lblHint, lblStatus, lblUrl, lblSourcePath;
+        Label lblHint, lblStatus, lblUrl, lblSourcePath, lblTemp;
         FlatProgress bar;
         RichTextBox log;
         CardPanel logWrap;
         Panel installScroll;
-        CardGroup progressCard;
+        CardGroup cardProduct, cardSource, cardComponents, progressCard;
         FlatButton btnStart, btnCancel, btnLog, btnTheme;
         Dictionary<string, CheckBox> checks = new Dictionary<string, CheckBox>();
         CancellationTokenSource cts;
@@ -394,6 +399,7 @@ namespace O365Installer
         internal static int UiTestProductIndex = -1;
         internal static int UiTestSwitchLang = -1;
         internal static int UiTestPage = -1;
+        internal static bool UiTestCollapse = false;
 
         public MainForm(bool uiTest)
         {
@@ -407,6 +413,7 @@ namespace O365Installer
                 {
                     try
                     {
+                        if (UiTestCollapse) CollapseInstallCards();
                         Activate();
                         TopMost = true;
                         Application.DoEvents();
@@ -429,6 +436,19 @@ namespace O365Installer
         LicenseForm embLicense;
         UninstallForm embUninstall;
 
+        /// <summary>侧边栏各导航项的图标（Segoe MDL2 Assets）。</summary>
+        static readonly string[] NavGlyphs = new string[] { "\uE80F", "\uE8D7", "\uE74D", "\uE713", "\uE946" };
+
+        /// <summary>侧边栏各导航项的中文原文，同时用作翻译键。</summary>
+        static readonly string[] NavKeys = new string[] { "安装", "授权管理", "卸载旧版", "设置", "关于" };
+
+        /// <summary>按当前界面语言刷新侧边栏文案（自绘控件，不参与 L.Apply）。</summary>
+        void SyncNavTexts()
+        {
+            if (nav == null) return;
+            for (int i = 0; i < NavKeys.Length; i++) nav.SetText(i, L.T(NavKeys[i]));
+        }
+
         void BuildUi()
         {
             Text = L.T("Office 离线安装器");
@@ -450,11 +470,7 @@ namespace O365Installer
 
             nav = new SideNav();
             nav.Dock = DockStyle.Left;
-            nav.Add("\uE80F", L.T("安装"));
-            nav.Add("\uE8D7", L.T("授权管理"));
-            nav.Add("\uE74D", L.T("卸载旧版"));
-            nav.Add("\uE713", L.T("设置"));
-            nav.Add("\uE946", L.T("关于"));
+            for (int i = 0; i < NavKeys.Length; i++) nav.Add(NavGlyphs[i], L.T(NavKeys[i]));
             nav.SelectedIndex = 0;
             nav.SelectedIndexChanged += delegate { ShowPage(nav.SelectedIndex); };
             Controls.Add(nav);
@@ -466,8 +482,8 @@ namespace O365Installer
             pageAbout = NewPage();
 
             BuildInstallPage(pageInstall);
-            AddPageHeader(pageActivation, L.T("授权管理"), L.T("查询授权状态、安装密钥、配置 KMS 主机"));
-            AddPageHeader(pageUninstall, L.T("卸载旧版"), L.T("清理残留的即点即用版或 MSI 版 Office"));
+            AddPageHeader(pageActivation, "授权管理", "查询授权状态、安装密钥、配置 KMS 主机");
+            AddPageHeader(pageUninstall, "卸载旧版", "清理残留的即点即用版或 MSI 版 Office");
             BuildSettingsPage(pageSettings);
             BuildAboutPage(pageAbout);
 
@@ -481,7 +497,7 @@ namespace O365Installer
 
             ShowPage(UiTestPage >= 0 ? UiTestPage : 0);
             Theme.Apply(this);
-            FitInstallPage();
+            ReflowInstallCards();
             UpdateThemeButton();
             ActiveControl = null;
 
@@ -516,40 +532,116 @@ namespace O365Installer
             return l;
         }
 
+        void HookCollapse(CardGroup c)
+        {
+            c.AllowCollapse = true;
+            c.ExpandedHeight = c.Height;
+            c.CollapsedChanged += delegate { ReflowInstallCards(); };
+        }
+
+        void SyncSourceVisibility()
+        {
+            if (rbImg == null || lblUrl == null || cardSource == null) return;
+            if (cardSource.Collapsed)
+            {
+                lblUrl.Visible = false;
+                tbUrl.Visible = false;
+                lblSourcePath.Visible = false;
+                return;
+            }
+            ProductDef p = SelectedProduct;
+            bool useImg = rbImg.Checked && p != null && p.Img;
+            lblUrl.Visible = useImg;
+            tbUrl.Visible = useImg;
+            lblSourcePath.Visible = !useImg;
+        }
+
+        void CollapseInstallCards()
+        {
+            if (cardProduct != null) cardProduct.Collapsed = true;
+            if (cardSource != null) cardSource.Collapsed = true;
+            if (cardComponents != null) cardComponents.Collapsed = true;
+            if (progressCard != null) progressCard.Collapsed = true;
+            ReflowInstallCards();
+        }
+
+        void ReflowInstallCards()
+        {
+            if (installScroll == null) return;
+            SyncSourceVisibility();
+            CardGroup[] cards = new CardGroup[] { cardProduct, cardSource, cardComponents, progressCard };
+            int y = 74;
+            for (int i = 0; i < cards.Length; i++)
+            {
+                if (cards[i] == null) continue;
+                cards[i].Location = new Point(cards[i].Location.X, y);
+                y = cards[i].Bottom + 12;
+            }
+            FitInstallPage();
+        }
+
         void FitInstallPage()
         {
             if (installScroll == null || progressCard == null) return;
-            int have = installScroll.ClientSize.Height;
-            int need = progressCard.Bottom + 8;
-            if (need <= have) return;
+            if (progressCard.Collapsed) return;
+            int full = progressCard.ExpandedHeight;
+            if (full < 96) return;
 
-            int over = need - have;
-            int target = progressCard.Height - over;
-            if (target < 96) target = 96;
-            int delta = progressCard.Height - target;
-            progressCard.Height = target;
+            int have = installScroll.ClientSize.Height;
+            int need = progressCard.Top + full + 8;
+            int target = full;
+            if (need > have)
+            {
+                target = full - (need - have);
+                if (target < 96) target = 96;
+            }
+
+            if (progressCard.Height != target) progressCard.Height = target;
             if (logWrap != null)
             {
-                int lh = logWrap.Height - delta;
-                logWrap.Height = lh < 34 ? 34 : lh;
+                int lh = 68 - (full - target);
+                if (lh < 34) lh = 34;
+                if (logWrap.Height != lh) logWrap.Height = lh;
             }
         }
 
-        void AddPageHeader(Panel page, string title, string sub)
+        /// <summary>页头标签与它对应的中文原文，供界面语言切换时就地刷新。</summary>
+        readonly List<KeyValuePair<Label, string>> headerLabels = new List<KeyValuePair<Label, string>>();
+
+        /// <summary>
+        /// 为分页添加标题与副标题。参数均为中文原文（既作为显示文本，也作为翻译键）。
+        /// subZh 传 null 或空串时只添加标题。
+        /// </summary>
+        void AddPageHeader(Panel page, string titleZh, string subZh)
         {
             Label hd = new Label();
-            hd.Text = title;
+            hd.Text = L.T(titleZh);
             hd.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
             hd.AutoSize = true;
             hd.Location = new Point(2, 0);
             page.Controls.Add(hd);
+            headerLabels.Add(new KeyValuePair<Label, string>(hd, titleZh));
+
+            if (string.IsNullOrEmpty(subZh)) return;
 
             Label hs = new Label();
-            hs.Text = sub;
+            hs.Text = L.T(subZh);
             hs.Tag = "sub";
             hs.AutoSize = true;
             hs.Location = new Point(3, 38);
             page.Controls.Add(hs);
+            headerLabels.Add(new KeyValuePair<Label, string>(hs, subZh));
+        }
+
+        /// <summary>按当前界面语言刷新所有页头文案。</summary>
+        void SyncHeaderTexts()
+        {
+            foreach (KeyValuePair<Label, string> kv in headerLabels)
+            {
+                if (kv.Key == null) continue;
+                string t = L.T(kv.Value);
+                if (kv.Key.Text != t) kv.Key.Text = t;
+            }
         }
 
         void ShowPage(int i)
@@ -615,25 +707,14 @@ namespace O365Installer
             page.Controls.Add(installScroll);
             page.Controls.SetChildIndex(installScroll, 0);
 
-            Label hd = new Label();
-            hd.Text = L.T("安装");
-            hd.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
-            hd.AutoSize = true;
-            hd.Location = new Point(2, 0);
-            installScroll.Controls.Add(hd);
+            AddPageHeader(installScroll, "安装", "选择产品与安装源，安装过程可随时取消");
 
-            Label hs = new Label();
-            hs.Text = L.T("选择产品与安装源，安装过程可随时取消");
-            hs.Tag = "sub";
-            hs.AutoSize = true;
-            hs.Location = new Point(3, 38);
-            installScroll.Controls.Add(hs);
-
-            CardGroup ca = new CardGroup();
+            CardGroup ca = cardProduct = new CardGroup();
             ca.Text = L.T("产品与语言");
             ca.Location = new Point(0, 74);
             ca.Size = new Size(W, 150);
             installScroll.Controls.Add(ca);
+            HookCollapse(ca);
 
             RowLabel(ca, L.T("产品"), 16, 32);
             cbProduct = new FlatCombo();
@@ -682,11 +763,12 @@ namespace O365Installer
             };
             cbLang.SelectedIndexChanged += delegate { if (!applying) AutoFillUrl(); };
 
-            CardGroup cb = new CardGroup();
+            CardGroup cb = cardSource = new CardGroup();
             cb.Text = L.T("安装源");
             cb.Location = new Point(0, 232);
             cb.Size = new Size(W, 190);
             installScroll.Controls.Add(cb);
+            HookCollapse(cb);
 
             rbImg = new RadioButton();
             rbImg.Text = L.T("离线镜像 (.img)");
@@ -733,7 +815,7 @@ namespace O365Installer
             chkKeep.Size = new Size(500, 24);
             cb.Controls.Add(chkKeep);
 
-            Label l5 = new Label();
+            Label l5 = lblTemp = new Label();
             l5.Text = L.T("临时文件: ") + WorkDir;
             l5.Tag = "sub";
             l5.Font = new Font("Microsoft YaHei UI", 8F);
@@ -746,11 +828,12 @@ namespace O365Installer
             rbOdt.CheckedChanged += delegate { if (!applying) ToggleMode(); };
             ToggleMode();
 
-            CardGroup cc = new CardGroup();
+            CardGroup cc = cardComponents = new CardGroup();
             cc.Text = L.T("要安装的组件（取消勾选 = 不安装）");
             cc.Location = new Point(0, 434);
             cc.Size = new Size(W, 104);
             installScroll.Controls.Add(cc);
+            HookCollapse(cc);
 
             string[] on = new string[] { "Word", "Excel", "PowerPoint" };
             for (int i = 0; i < AppNames.Length; i++)
@@ -772,6 +855,7 @@ namespace O365Installer
             cd.Location = new Point(0, 550);
             cd.Size = new Size(W, 156);
             installScroll.Controls.Add(cd);
+            HookCollapse(cd);
 
             bar = new FlatProgress();
             bar.Location = new Point(16, 32);
@@ -835,19 +919,7 @@ namespace O365Installer
         {
             int W = 728;
 
-            Label hd = new Label();
-            hd.Text = L.T("设置");
-            hd.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
-            hd.AutoSize = true;
-            hd.Location = new Point(2, 0);
-            page.Controls.Add(hd);
-
-            Label hs = new Label();
-            hs.Text = L.T("界面语言与外观");
-            hs.Tag = "sub";
-            hs.AutoSize = true;
-            hs.Location = new Point(3, 38);
-            page.Controls.Add(hs);
+            AddPageHeader(page, "设置", "界面语言与外观");
 
             CardGroup ca = new CardGroup();
             ca.Text = L.T("界面");
@@ -902,12 +974,7 @@ namespace O365Installer
 
         void BuildAboutPage(Panel page)
         {
-            Label hd = new Label();
-            hd.Text = L.T("关于");
-            hd.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
-            hd.AutoSize = true;
-            hd.Location = new Point(2, 0);
-            page.Controls.Add(hd);
+            AddPageHeader(page, "关于", null);
 
             CardGroup ca = new CardGroup();
             ca.Text = L.T("Office 离线安装器");
@@ -1008,6 +1075,7 @@ namespace O365Installer
             foreach (CheckBox c in checks.Values) c.Enabled = multi && !busy;
 
             if (useImg) AutoFillUrl();
+            SyncSourceVisibility();
         }
 
         void FillLanguages()
