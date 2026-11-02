@@ -16,8 +16,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyVersion("1.1.1.0")]
-[assembly: AssemblyFileVersion("1.1.1.0")]
+[assembly: AssemblyVersion("1.1.2.0")]
+[assembly: AssemblyFileVersion("1.1.2.0")]
 
 namespace O365Installer
 {
@@ -91,6 +91,30 @@ namespace O365Installer
             {
                 LicenseForm.UiTestShot = true;
                 Application.Run(new LicenseForm());
+                return;
+            }
+            if (uiTest && args.Length > 1 && args[1] == "consent")
+            {
+                ConsentForm cf = new ConsentForm(false);
+                cf.Show();
+                System.Windows.Forms.Timer t = new System.Windows.Forms.Timer();
+                t.Interval = 800;
+                t.Tick += delegate
+                {
+                    t.Stop();
+                    try
+                    {
+                        Rectangle r = new Rectangle(0, 0, cf.ClientSize.Width, cf.ClientSize.Height);
+                        Bitmap b = new Bitmap(r.Width, r.Height);
+                        cf.DrawToBitmap(b, r);
+                        b.Save(Path.Combine(Path.GetTempPath(), "o365consent_ui.png"));
+                        b.Dispose();
+                    }
+                    catch { }
+                    cf.Close();
+                };
+                t.Start();
+                Application.Run(cf);
                 return;
             }
             if (uiTest && args.Length > 1)
