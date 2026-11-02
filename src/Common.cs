@@ -70,7 +70,14 @@ namespace O365Installer
                 catch { }
                 if (string.IsNullOrEmpty(url)) url = FallbackUrl;
                 if (log != null) log(L.T("ODT 下载地址: ") + url);
-                Net.Download(url, odtExe, ct);
+                try
+                {
+                    Net.Download(url, odtExe, ct);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(L.T("下载 Office 部署工具失败：") + ex.Message + L.T("。请检查网络或代理设置后重试。"));
+                }
                 if (log != null) log(L.T("ODT 下载完成: ") + (new FileInfo(odtExe).Length / 1024) + " KB");
             }
 

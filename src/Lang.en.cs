@@ -340,6 +340,27 @@ namespace O365Installer
             En("界面语言与外观", "Language and appearance");
             En("封装微软官方 ODT，安装源来自 officecdn.microsoft.com，不提供任何激活绕过。", "Wraps the official Microsoft ODT. Sources come from officecdn.microsoft.com; no activation bypass is provided.");
             En("MIT 许可 · 与微软公司无隶属或背书关系", "MIT licensed · Not affiliated with or endorsed by Microsoft");
+            En("已安装的 Office 含有你未勾选的组件：", "The installed Office includes components you unchecked: ");
+            En("仅安装不会移除这些组件，是否先卸载现有 Office 再安装？", "Installing will not remove them. Remove the existing Office first?");
+            En("卸载现有 Office...", "Removing existing Office...");
+            En("开始卸载现有 Office...", "Removing existing Office...");
+            En("调用 setup.exe 卸载，请在弹出窗口中确认", "Running setup.exe to remove; confirm in the prompt");
+            En("卸载返回码: ", "Removal exit code: ");
+            En("卸载现有 Office 失败，返回码 ", "Failed to remove existing Office, code ");
+            En("。请查看日志目录。", ". See the log folder.");
+            En("已卸载现有 Office，继续安装", "Existing Office removed, continuing");
+            En("卸载进程返回 0，但系统中仍检测到 Office", "Setup returned 0 but Office is still detected");
+            En("卸载进程返回成功，但系统里仍能检测到 Office。请重启后再执行一次；若仍不生效，请查看日志目录里的 setup 日志。", "Setup reported success but Office is still detected. Restart and try again; if it still fails, check the setup logs.");
+            En("17002 = 部署工具版本低于已安装的 Office，请更新 ODT 后重试", "17002 = deployment tool is older than the installed Office; update the ODT and retry");
+            En("卸载未成功，返回码 ", "Removal failed, code ");
+            En("卸载未成功", "Removal failed");
+            En("下载 Office 部署工具失败：", "Failed to download the Office Deployment Tool: ");
+            En("。请检查网络或代理设置后重试。", ". Check your network or proxy settings and retry.");
+            En("部署工具版本低于已安装 Office（", "Deployment tool is older than the installed Office (");
+            En("），卸载可能被拒绝", "); removal may be refused");
+            En("改用系统内置卸载接口重试...", "Retrying with the built-in removal interface...");
+            En("系统卸载接口返回码: ", "Built-in removal exit code: ");
+            En("部署工具版本低于已安装的 Office，卸载被拒绝。可改用「设置 - 应用」卸载，或保留安装源后用它卸载", "The deployment tool is older than the installed Office, so removal was refused. Use Settings > Apps instead, or remove with the source files you kept.");
             EnConsent();
         }
 

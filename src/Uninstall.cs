@@ -15,6 +15,89 @@ namespace O365Installer
     static class OfficeRemover
     {
 
+        public static string InstalledVersion()
+        {
+            string[] paths = new string[]
+            {
+                @"SOFTWARE\Microsoft\Office\ClickToRun\Configuration",
+                @"SOFTWARE\WOW6432Node\Microsoft\Office\ClickToRun\Configuration"
+            };
+            foreach (string p in paths)
+            {
+                try
+                {
+                    using (RegistryKey k = Registry.LocalMachine.OpenSubKey(p))
+                    {
+                        if (k == null) continue;
+                        object ver = k.GetValue("VersionToReport");
+                        if (ver != null) return ver.ToString();
+                    }
+                }
+                catch { }
+            }
+            return null;
+        }
+
+        public static string InstalledProductId()
+        {
+            string[] paths = new string[]
+            {
+                @"SOFTWARE\Microsoft\Office\ClickToRun\Configuration",
+                @"SOFTWARE\WOW6432Node\Microsoft\Office\ClickToRun\Configuration"
+            };
+            foreach (string p in paths)
+            {
+                try
+                {
+                    using (RegistryKey k = Registry.LocalMachine.OpenSubKey(p))
+                    {
+                        if (k == null) continue;
+                        object ids = k.GetValue("ProductReleaseIds");
+                        if (ids == null) continue;
+                        string v = ids.ToString();
+                        int comma = v.IndexOf(',');
+                        return comma > 0 ? v.Substring(0, comma).Trim() : v.Trim();
+                    }
+                }
+                catch { }
+            }
+            return null;
+        }
+
+        public static string InstalledCulture()
+        {
+            try
+            {
+                using (RegistryKey k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Office\ClickToRun\Configuration"))
+                {
+                    if (k == null) return "zh-cn";
+                    object c = k.GetValue("ClientCulture");
+                    return c == null ? "zh-cn" : c.ToString();
+                }
+            }
+            catch { return "zh-cn"; }
+        }
+
+        public static string ClickToRunExe()
+        {
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonProgramFiles), @"microsoft shared\ClickToRun");
+            string exe = Path.Combine(dir, "OfficeClickToRun.exe");
+            return File.Exists(exe) ? exe : null;
+        }
+
+        public static string ToolVersion(string exe)
+        {
+            try { return FileVersionInfo.GetVersionInfo(exe).FileVersion; }
+            catch { return null; }
+        }
+
+        public static int CompareVersion(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return 0;
+            try { return new Version(a).CompareTo(new Version(b)); }
+            catch { return 0; }
+        }
+
         public static string GetC2RInfo()
         {
             string[] paths = new string[]
@@ -301,6 +384,11 @@ namespace O365Installer
                 string wd = workDir;
                 Action<string> act = new Action<string>(Log);
                 string setup = await Task.Run(delegate { return OdtTools.Ensure(wd, act, cts.Token); });
+                string instVer = OfficeRemover.InstalledVersion();
+                string toolVer = OfficeRemover.ToolVersion(setup);
+                if (instVer != null && toolVer != null && OfficeRemover.CompareVersion(toolVer, instVer) < 0)
+                    Log(L.T("部署工具版本低于已安装 Office（") + toolVer + " < " + instVer + L.T("），卸载可能被拒绝"));
+
                 string cfg = Path.Combine(wd, "remove.xml");
                 File.WriteAllText(cfg, OfficeRemover.BuildRemoveC2RXml(wd), new UTF8Encoding(false));
 
@@ -311,8 +399,53 @@ namespace O365Installer
                     return OdtTools.RunSetup(setup, "/configure \"" + cfg + "\"", sd, null, cts.Token);
                 });
                 Log(L.T("卸载进程返回码: ") + rc);
-                if (rc == 0) Log(L.T("已卸载完成"));
-                else Log(L.T("卸载未成功，可查看 %TEMP% 下的 Office 日志"));
+                if (rc == 0)
+                {
+                    await Task.Delay(1500);
+                    c2rInfo = OfficeRemover.GetC2RInfo();
+                    if (c2rInfo == null) Log(L.T("已卸载完成"));
+                    else
+                    {
+                        Log(L.T("卸载进程返回 0，但系统中仍检测到 Office"));
+                        MessageBox.Show(L.T("卸载进程返回成功，但系统里仍能检测到 Office。请重启后再执行一次；若仍不生效，请查看日志目录里的 setup 日志。"),
+                            L.T("提示"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
+                else
+                {
+                    string fallback = OfficeRemover.ClickToRunExe();
+                    string pid = OfficeRemover.InstalledProductId();
+                    if (fallback != null && pid != null)
+                    {
+                        Log(L.T("改用系统内置卸载接口重试..."));
+                        string culture = OfficeRemover.InstalledCulture();
+                        string args = "scenario=install scenariosubtype=ARP sourcetype=None productstoremove=" + pid + ".16_" + culture + "_x-none culture=" + culture + " version=16.0.0.0";
+                        try
+                        {
+                            using (Process p = Process.Start(fallback, args))
+                            {
+                                p.WaitForExit(600000);
+                                Log(L.T("系统卸载接口返回码: ") + p.ExitCode);
+                            }
+                            await Task.Delay(3000);
+                            c2rInfo = OfficeRemover.GetC2RInfo();
+                            if (c2rInfo == null)
+                            {
+                                Log(L.T("已卸载完成"));
+                                RefreshList();
+                                SetBusy(false);
+                                return;
+                            }
+                        }
+                        catch (Exception ex2) { Log(L.T("失败: ") + ex2.Message); }
+                    }
+
+                    rc = 17002;
+                    string hint = L.T("部署工具版本低于已安装的 Office，卸载被拒绝。可改用「设置 - 应用」卸载，或保留安装源后用它卸载");
+                    Log(L.T("卸载未成功，可查看 %TEMP% 下的 Office 日志") + (hint.Length > 0 ? "；" + hint : ""));
+                    MessageBox.Show(L.T("卸载未成功，返回码 ") + rc + (hint.Length > 0 ? "\r\n\r\n" + hint : ""),
+                        L.T("卸载未成功"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
                 RefreshList();
             }
             catch (OperationCanceledException)

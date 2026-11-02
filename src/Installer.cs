@@ -17,8 +17,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyVersion("1.4.0.0")]
-[assembly: AssemblyFileVersion("1.4.0.0")]
+[assembly: AssemblyVersion("1.4.1.0")]
+[assembly: AssemblyFileVersion("1.4.1.0")]
 
 namespace O365Installer
 {
@@ -1239,10 +1239,78 @@ namespace O365Installer
                 Log(L.T("未发现已安装的 Office"));
             }
 
+            if (old.Count > 0 && exclude.Count > 0)
+            {
+                List<string> leftover = InstalledExcluded(exclude);
+                if (leftover.Count > 0)
+                {
+                    DialogResult dr = MessageBox.Show(
+                        L.T("已安装的 Office 含有你未勾选的组件：") + string.Join("、", leftover.ToArray()) + Environment.NewLine + Environment.NewLine +
+                        L.T("仅安装不会移除这些组件，是否先卸载现有 Office 再安装？"),
+                        L.T("确认"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+                    if (dr == DialogResult.Cancel) throw new Exception(L.T("已取消"));
+                    if (dr == DialogResult.Yes) await RemoveExistingOffice(ct);
+                }
+            }
+
             if (useImg)
                 await InstallFromImage(url, prod, lang, arch, exclude, keepSource, ct);
             else
                 await InstallFromOdt(prod, lang, arch, exclude, keepSource, ct);
+        }
+
+        static readonly string[] OfficeRoots = new string[]
+        {
+            @"C:\Program Files\Microsoft Office\root\Office16",
+            @"C:\Program Files (x86)\Microsoft Office\root\Office16",
+            @"C:\Program Files\Microsoft Office\Office16",
+            @"C:\Program Files (x86)\Microsoft Office\Office16"
+        };
+
+        static readonly Dictionary<string, string> AppExe = new Dictionary<string, string>
+        {
+            { "Word", "WINWORD.EXE" }, { "Excel", "EXCEL.EXE" }, { "PowerPoint", "POWERPNT.EXE" },
+            { "Outlook", "OUTLOOK.EXE" }, { "OneNote", "ONENOTE.EXE" }, { "Access", "MSACCESS.EXE" },
+            { "Publisher", "MSPUB.EXE" }
+        };
+
+        static List<string> InstalledExcluded(List<string> exclude)
+        {
+            List<string> hit = new List<string>();
+            foreach (string app in exclude)
+            {
+                string exe;
+                if (!AppExe.TryGetValue(app, out exe)) continue;
+                foreach (string root in OfficeRoots)
+                {
+                    try
+                    {
+                        if (File.Exists(Path.Combine(root, exe))) { hit.Add(app); break; }
+                    }
+                    catch { }
+                }
+            }
+            return hit;
+        }
+
+        async Task RemoveExistingOffice(CancellationToken ct)
+        {
+            Report(6, L.T("卸载现有 Office..."));
+            Log(L.T("开始卸载现有 Office..."), Color.FromArgb(190, 120, 0));
+            Directory.CreateDirectory(WorkDir);
+            Directory.CreateDirectory(LogDir);
+
+            string odt = await Task.Run(delegate { return OdtTools.Ensure(WorkDir, delegate(string m) { Log(m); }, ct); }, ct);
+            string cfg = Path.Combine(WorkDir, "remove.xml");
+            File.WriteAllText(cfg, OfficeRemover.BuildRemoveC2RXml(LogDir), new UTF8Encoding(false));
+            Log(L.T("调用 setup.exe 卸载，请在弹出窗口中确认"), Color.FromArgb(150, 120, 40));
+
+            string sd = Path.GetDirectoryName(odt);
+            int rc = await Task.Run(delegate { return OdtTools.RunSetup(odt, "/configure \"" + cfg + "\"", sd, null, ct); }, ct);
+            Log(L.T("卸载返回码: ") + rc);
+            if (rc != 0) throw new Exception(L.T("卸载现有 Office 失败，返回码 ") + rc + L.T("。请查看日志目录。"));
+            await Task.Delay(1500, ct);
+            Log(L.T("已卸载现有 Office，继续安装"), Color.FromArgb(0, 130, 60));
         }
 
         async Task InstallFromImage(string url, ProductDef prod, string lang, string arch, List<string> exclude, bool keepSource, CancellationToken ct)
