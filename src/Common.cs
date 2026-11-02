@@ -69,9 +69,9 @@ namespace O365Installer
                 }
                 catch { }
                 if (string.IsNullOrEmpty(url)) url = FallbackUrl;
-                if (log != null) log("ODT 下载地址: " + url);
+                if (log != null) log(L.T("ODT 下载地址: ") + url);
                 Net.Download(url, odtExe, ct);
-                if (log != null) log("ODT 下载完成: " + (new FileInfo(odtExe).Length / 1024) + " KB");
+                if (log != null) log(L.T("ODT 下载完成: ") + (new FileInfo(odtExe).Length / 1024) + " KB");
             }
 
             ProcessStartInfo psi = new ProcessStartInfo(odtExe);
@@ -81,7 +81,7 @@ namespace O365Installer
             using (Process p = Process.Start(psi)) p.WaitForExit(180000);
 
             for (int i = 0; i < 20 && !File.Exists(setup); i++) Thread.Sleep(500);
-            if (!File.Exists(setup)) throw new Exception("ODT 解压失败，可能是安全软件拦截了部署工具。");
+            if (!File.Exists(setup)) throw new Exception(L.T("ODT 解压失败，可能是安全软件拦截了部署工具。"));
             return setup;
         }
 
@@ -102,7 +102,7 @@ namespace O365Installer
                         ct.ThrowIfCancellationRequested();
                     }
                     Thread.Sleep(500);
-                    if (tick != null) tick("已用时 " + (DateTime.Now - start).ToString(@"mm\:ss"));
+                    if (tick != null) tick(L.T("已用时 ") + (DateTime.Now - start).ToString(@"mm\:ss"));
                 }
                 return p.ExitCode;
             }

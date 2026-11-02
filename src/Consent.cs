@@ -7,7 +7,9 @@ namespace O365Installer
 
     class ConsentForm : Form
     {
-        public const string Body =
+        public static string Body { get { return L.T(BodyZh); } }
+
+        public const string BodyZh =
             "使用本程序前请阅读以下条款：" + "\r\n\r\n" +
             "1. 本程序是微软 Office 部署工具（ODT / setup.exe）的图形化前端，仅调用微软官方公开的安装与部署机制；" +
             "安装源来自微软官方 CDN（officecdn.microsoft.com）。" + "\r\n\r\n" +
@@ -22,7 +24,7 @@ namespace O365Installer
 
         public ConsentForm(bool consent)
         {
-            Text = consent ? "免责声明 - 请阅读并确认" : "免责声明";
+            Text = consent ? L.T("免责声明 - 请阅读并确认") : L.T("免责声明");
             ClientSize = new Size(600, 452);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -45,7 +47,7 @@ namespace O365Installer
             if (consent)
             {
                 Label t = new Label();
-                t.Text = "同意后方可使用本程序；不同意将直接退出。";
+                t.Text = L.T("同意后方可使用本程序；不同意将直接退出");
                 t.ForeColor = Color.FromArgb(120, 125, 135);
                 t.Font = new Font("Microsoft YaHei UI", 8F);
                 t.Location = new Point(16, 394);
@@ -53,7 +55,7 @@ namespace O365Installer
                 Controls.Add(t);
 
                 Button ok = new Button();
-                ok.Text = "同意并继续";
+                ok.Text = L.T("同意并继续");
                 ok.Location = new Point(352, 396);
                 ok.Size = new Size(120, 36);
                 ok.BackColor = Color.FromArgb(0, 120, 212);
@@ -64,7 +66,7 @@ namespace O365Installer
                 Controls.Add(ok);
 
                 Button no = new Button();
-                no.Text = "不同意，退出";
+                no.Text = L.T("不同意，退出");
                 no.Location = new Point(482, 396);
                 no.Size = new Size(104, 36);
                 no.DialogResult = DialogResult.Cancel;
@@ -76,7 +78,7 @@ namespace O365Installer
             else
             {
                 Button close = new Button();
-                close.Text = "关闭";
+                close.Text = L.T("关闭");
                 close.Location = new Point(482, 396);
                 close.Size = new Size(104, 36);
                 close.DialogResult = DialogResult.OK;

@@ -92,7 +92,7 @@ namespace O365Installer
         public static string Run(string args)
         {
             string vbs = FindOsppVbs();
-            if (vbs == null) throw new Exception("当前 Office 安装目录中没有 OSPP.VBS（该脚本只随部分安装包提供），无法通过它管理授权。可打开 Word 用账号登录激活。");
+            if (vbs == null) throw new Exception(L.T("当前 Office 安装目录中没有 OSPP.VBS（该脚本只随部分安装包提供），无法通过它管理授权。可打开 Word 用账号登录激活。"));
 
             ProcessStartInfo psi = new ProcessStartInfo("cscript.exe");
             psi.Arguments = "//nologo \"" + vbs + "\" " + args;
@@ -109,7 +109,7 @@ namespace O365Installer
                 if (!p.WaitForExit(120000))
                 {
                     try { p.Kill(); } catch { }
-                    throw new Exception("执行超时。");
+                    throw new Exception(L.T("执行超时。"));
                 }
                 return o + e;
             }
@@ -162,7 +162,7 @@ namespace O365Installer
         public static string OfficeInfo(string key)
         {
             string v = ReadReg(@"SOFTWARE\Microsoft\Office\ClickToRun\Configuration", key);
-            return string.IsNullOrEmpty(v) ? "（未读取到）" : v;
+            return string.IsNullOrEmpty(v) ? L.T("（未读取到）") : v;
         }
 
         public static List<LicEntry> Parse(string outp)
@@ -207,16 +207,16 @@ namespace O365Installer
             if (k.StartsWith("office16")) k = k.Substring(8);
             else if (k.StartsWith("office15")) k = k.Substring(8);
 
-            if (k == "o365proplusr_subscription2") return "Microsoft 365 企业应用版";
-            if (k == "o365businessr_subscription2") return "Microsoft 365 商业版";
-            if (k == "o365homepremr_subscription2") return "Microsoft 365 家庭版";
-            if (k == "proplusvl_kms_client") return "Office 专业增强版（KMS）";
-            if (k == "standardvl_kms_client") return "Office 标准版（KMS）";
-            if (k == "proplusr_grace") return "Office 专业增强版（零售）";
-            if (k == "visioprovl_kms_client") return "Visio 专业版（KMS）";
-            if (k == "visiostdvl_kms_client") return "Visio 标准版（KMS）";
-            if (k == "projectprovol_kms_client") return "Project 专业版（KMS）";
-            if (k == "projectstdvol_kms_client") return "Project 标准版（KMS）";
+            if (k == "o365proplusr_subscription2") return L.T("Microsoft 365 企业应用版");
+            if (k == "o365businessr_subscription2") return L.T("Microsoft 365 商业版");
+            if (k == "o365homepremr_subscription2") return L.T("Microsoft 365 家庭版");
+            if (k == "proplusvl_kms_client") return L.T("Office 专业增强版（KMS）");
+            if (k == "standardvl_kms_client") return L.T("Office 标准版（KMS）");
+            if (k == "proplusr_grace") return L.T("Office 专业增强版（零售）");
+            if (k == "visioprovl_kms_client") return L.T("Visio 专业版（KMS）");
+            if (k == "visiostdvl_kms_client") return L.T("Visio 标准版（KMS）");
+            if (k == "projectprovol_kms_client") return L.T("Project 专业版（KMS）");
+            if (k == "projectstdvol_kms_client") return L.T("Project 标准版（KMS）");
             return s;
         }
 
@@ -227,18 +227,18 @@ namespace O365Installer
             int p = s.IndexOf('(');
             if (p > 0) s = s.Substring(0, p);
             s = s.Trim();
-            s = s.Replace("days", "天").Replace("day", "天").Replace("hours", "小时").Replace("hour", "小时").Replace("minutes", "分钟");
+            s = s.Replace("days", L.T("天")).Replace("day", L.T("天")).Replace("hours", L.T("小时")).Replace("hour", L.T("小时")).Replace("minutes", L.T("分钟"));
             return s.Trim();
         }
 
         public static string StatusText(string raw)
         {
             string u = (raw ?? "").ToUpper();
-            if (u.Contains("---LICENSED---")) return "已激活";
-            if (u.Contains("---OOB_GRACE---") || u.Contains("---OOT_GRACE---")) return "宽限期";
-            if (u.Contains("---NOTIFICATIONS---")) return "通知模式";
-            if (u.Contains("---UNLICENSED---")) return "未激活";
-            if (u.Length == 0) return "未知";
+            if (u.Contains("---LICENSED---")) return L.T("已激活");
+            if (u.Contains("---OOB_GRACE---") || u.Contains("---OOT_GRACE---")) return L.T("宽限期");
+            if (u.Contains("---NOTIFICATIONS---")) return L.T("通知模式");
+            if (u.Contains("---UNLICENSED---")) return L.T("未激活");
+            if (u.Length == 0) return L.T("未知");
             return raw.Trim('-');
         }
 
@@ -295,7 +295,7 @@ namespace O365Installer
 
         void BuildUi()
         {
-            Text = "授权管理（调用微软 OSPP）";
+            Text = L.T("授权管理（调用微软 OSPP）");
             ClientSize = new Size(640, 600);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -306,7 +306,7 @@ namespace O365Installer
             BackColor = Color.FromArgb(248, 249, 251);
 
             lblSummary = new Label();
-            lblSummary.Text = "正在读取授权状态...";
+            lblSummary.Text = L.T("正在读取授权状态...");
             lblSummary.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
             lblSummary.Location = new Point(16, 12);
             lblSummary.Size = new Size(608, 24);
@@ -329,14 +329,14 @@ namespace O365Installer
             lv.HeaderStyle = ColumnHeaderStyle.Nonclickable;
             lv.Location = new Point(16, 58);
             lv.Size = new Size(608, 126);
-            lv.Columns.Add("产品", 286);
-            lv.Columns.Add("状态", 80);
-            lv.Columns.Add("剩余宽限期", 96);
-            lv.Columns.Add("密钥尾号", 80);
+            lv.Columns.Add(L.T("产品"), 250);
+            lv.Columns.Add(L.T("状态"), 104);
+            lv.Columns.Add(L.T("剩余宽限期"), 108);
+            lv.Columns.Add(L.T("密钥尾号"), 92);
             Controls.Add(lv);
 
             Label lvCap = new Label();
-            lvCap.Text = "OSPP 原始输出";
+            lvCap.Text = L.T("OSPP 原始输出");
             lvCap.ForeColor = Color.FromArgb(120, 125, 135);
             lvCap.Font = new Font("Microsoft YaHei UI", 8F);
             lvCap.Location = new Point(16, 190);
@@ -354,7 +354,7 @@ namespace O365Installer
             Controls.Add(txtOut);
 
             GroupBox g1 = new GroupBox();
-            g1.Text = "产品密钥";
+            g1.Text = L.T("产品密钥");
             g1.Location = new Point(16, 350);
             g1.Size = new Size(608, 70);
             Controls.Add(g1);
@@ -366,14 +366,14 @@ namespace O365Installer
             g1.Controls.Add(txtKey);
 
             btnKey = new Button();
-            btnKey.Text = "安装密钥";
+            btnKey.Text = L.T("安装密钥");
             btnKey.Location = new Point(466, 27);
             btnKey.Size = new Size(126, 26);
             btnKey.Click += async delegate { await InstallKey(); };
             g1.Controls.Add(btnKey);
 
             GroupBox g2 = new GroupBox();
-            g2.Text = "KMS 主机（仅限使用你自己的授权服务器）";
+            g2.Text = L.T("KMS 主机（仅限使用你自己的授权服务器）");
             g2.Location = new Point(16, 428);
             g2.Size = new Size(608, 70);
             Controls.Add(g2);
@@ -385,21 +385,21 @@ namespace O365Installer
             g2.Controls.Add(txtKms);
 
             btnKms = new Button();
-            btnKms.Text = "设置并激活";
+            btnKms.Text = L.T("设置并激活");
             btnKms.Location = new Point(466, 27);
             btnKms.Size = new Size(126, 26);
             btnKms.Click += async delegate { await SetKms(); };
             g2.Controls.Add(btnKms);
 
             btnRefresh = new Button();
-            btnRefresh.Text = "刷新状态";
+            btnRefresh.Text = L.T("刷新状态");
             btnRefresh.Location = new Point(16, 506);
             btnRefresh.Size = new Size(96, 32);
             btnRefresh.Click += async delegate { await RefreshStatus(); };
             Controls.Add(btnRefresh);
 
             btnWord = new Button();
-            btnWord.Text = "打开 Word 登录";
+            btnWord.Text = L.T("打开 Word 登录");
             btnWord.Location = new Point(120, 506);
             btnWord.Size = new Size(116, 32);
             btnWord.Click += delegate
@@ -407,44 +407,44 @@ namespace O365Installer
                 string exe = OfficeLicense.FindWordExe();
                 if (exe == null)
                 {
-                    MessageBox.Show("未找到 WINWORD.EXE。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(L.T("未找到 WINWORD.EXE。"), L.T("提示"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 try { Process.Start(exe); }
-                catch (Exception ex) { MessageBox.Show(ex.Message, "启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                catch (Exception ex) { MessageBox.Show(ex.Message, L.T("启动失败"), MessageBoxButtons.OK, MessageBoxIcon.Error); }
             };
             Controls.Add(btnWord);
 
             btnIid = new Button();
-            btnIid.Text = "安装 ID";
+            btnIid.Text = L.T("安装 ID");
             btnIid.Location = new Point(244, 506);
-            btnIid.Size = new Size(88, 32);
+            btnIid.Size = new Size(104, 32);
             btnIid.Click += async delegate { await ShowInstallId(); };
             Controls.Add(btnIid);
 
             btnUnp = new Button();
-            btnUnp.Text = "卸载密钥";
-            btnUnp.Location = new Point(340, 506);
+            btnUnp.Text = L.T("卸载密钥");
+            btnUnp.Location = new Point(356, 506);
             btnUnp.Size = new Size(96, 32);
             btnUnp.Click += async delegate { await RemoveKey(); };
             Controls.Add(btnUnp);
 
             btnCkms = new Button();
-            btnCkms.Text = "清除 KMS 设置";
+            btnCkms.Text = L.T("清除 KMS 设置");
             btnCkms.Location = new Point(16, 546);
             btnCkms.Size = new Size(120, 32);
             btnCkms.Click += async delegate { await ClearKms(); };
             Controls.Add(btnCkms);
 
             btnExport = new Button();
-            btnExport.Text = "导出诊断报告";
+            btnExport.Text = L.T("导出诊断报告");
             btnExport.Location = new Point(144, 546);
-            btnExport.Size = new Size(120, 32);
+            btnExport.Size = new Size(170, 32);
             btnExport.Click += delegate { ExportReport(); };
             Controls.Add(btnExport);
 
             btnClose = new Button();
-            btnClose.Text = "关闭";
+            btnClose.Text = L.T("关闭");
             btnClose.Location = new Point(534, 546);
             btnClose.Size = new Size(90, 32);
             btnClose.DialogResult = DialogResult.OK;
@@ -490,14 +490,14 @@ namespace O365Installer
             d.Controls.Add(tb);
 
             Button ok = new Button();
-            ok.Text = "确定";
+            ok.Text = L.T("确定");
             ok.Location = new Point(226, 96);
             ok.Size = new Size(84, 32);
             ok.DialogResult = DialogResult.OK;
             d.Controls.Add(ok);
 
             Button no = new Button();
-            no.Text = "取消";
+            no.Text = L.T("取消");
             no.Location = new Point(320, 96);
             no.Size = new Size(84, 32);
             no.DialogResult = DialogResult.Cancel;
@@ -525,30 +525,30 @@ namespace O365Installer
                 if (!string.IsNullOrEmpty(iid))
                 {
                     try { Clipboard.SetText(iid); } catch { }
-                    MessageBox.Show("安装 ID 已复制到剪贴板：\r\n\r\n" + iid + "\r\n\r\n用于电话激活时向微软客服提供。",
-                        "安装 ID", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(L.T("安装 ID 已复制到剪贴板：\r\n\r\n") + iid + L.T("\r\n\r\n用于电话激活时向微软客服提供。"),
+                        L.T("安装 ID"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
-                    MessageBox.Show("未从输出中解析出安装 ID，请查看窗口内的原始输出。",
-                        "安装 ID", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(L.T("未从输出中解析出安装 ID，请查看窗口内的原始输出。"),
+                        L.T("安装 ID"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "获取安装 ID 失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(ex.Message, L.T("获取安装 ID 失败"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally { SetBusy(false); }
         }
 
         async Task RemoveKey()
         {
-            string tail = PromptInput("卸载密钥", "输入要卸载的产品密钥后 5 位（ospp /unpkey）", "");
+            string tail = PromptInput(L.T("卸载密钥"), L.T("输入要卸载的产品密钥后 5 位（ospp /unpkey）"), "");
             if (tail == null) return;
             tail = tail.Trim().ToUpper();
             if (tail.Length != 5)
             {
-                MessageBox.Show("需要 5 位字符，通常是密钥的最后一段。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(L.T("需要 5 位字符，通常是密钥的最后一段。"), L.T("提示"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -561,15 +561,15 @@ namespace O365Installer
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "卸载密钥失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(ex.Message, L.T("卸载密钥失败"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally { SetBusy(false); }
         }
 
         async Task ClearKms()
         {
-            DialogResult r = MessageBox.Show("将清除本机配置的 KMS 主机地址（ospp /ckms），产品密钥不受影响。\r\n\r\n继续？",
-                "清除 KMS 设置", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            DialogResult r = MessageBox.Show(L.T("将清除本机配置的 KMS 主机地址（ospp /ckms），产品密钥不受影响。\r\n\r\n继续？"),
+                L.T("清除 KMS 设置"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (r != DialogResult.Yes) return;
 
             SetBusy(true);
@@ -578,12 +578,12 @@ namespace O365Installer
                 string outp = await Task.Run(delegate { return OfficeLicense.Run("/ckms"); });
                 txtOut.Text = outp;
                 await RefreshStatus();
-                MessageBox.Show("已清除 KMS 设置。若产品本来靠 KMS 激活，之后需要重新指定可用主机。",
-                    "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(L.T("已清除 KMS 设置。若产品本来靠 KMS 激活，之后需要重新指定可用主机。"),
+                    L.T("完成"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "清除失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(ex.Message, L.T("清除失败"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally { SetBusy(false); }
         }
@@ -591,51 +591,51 @@ namespace O365Installer
         void ExportReport()
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine("Office 离线安装器 · 诊断报告");
-            sb.AppendLine("生成时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-            sb.AppendLine("程序版本: " + Assembly.GetExecutingAssembly().GetName().Version.ToString());
-            sb.AppendLine("系统: " + Environment.OSVersion.VersionString + (Environment.Is64BitOperatingSystem ? "（64 位）" : "（32 位）"));
+            sb.AppendLine(L.T("Office 离线安装器 · 诊断报告"));
+            sb.AppendLine(L.T("生成时间: ") + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            sb.AppendLine(L.T("程序版本: ") + Assembly.GetExecutingAssembly().GetName().Version.ToString());
+            sb.AppendLine(L.T("系统: ") + Environment.OSVersion.VersionString + (Environment.Is64BitOperatingSystem ? L.T("（64 位）") : L.T("（32 位）")));
             sb.AppendLine();
 
-            sb.AppendLine("---- Office 安装信息 ----");
-            sb.AppendLine("版本(VersionToReport): " + OfficeLicense.OfficeInfo("VersionToReport"));
-            sb.AppendLine("产品(ProductReleaseIds): " + OfficeLicense.OfficeInfo("ProductReleaseIds"));
-            sb.AppendLine("位数(Platform): " + OfficeLicense.OfficeInfo("Platform"));
-            sb.AppendLine("通道(CDNBaseUrl): " + OfficeLicense.OfficeInfo("CDNBaseUrl"));
-            sb.AppendLine("安装路径: " + OfficeLicense.OfficeInfo("InstallPath"));
+            sb.AppendLine(L.T("---- Office 安装信息 ----"));
+            sb.AppendLine(L.T("版本(VersionToReport): ") + OfficeLicense.OfficeInfo("VersionToReport"));
+            sb.AppendLine(L.T("产品(ProductReleaseIds): ") + OfficeLicense.OfficeInfo("ProductReleaseIds"));
+            sb.AppendLine(L.T("位数(Platform): ") + OfficeLicense.OfficeInfo("Platform"));
+            sb.AppendLine(L.T("通道(CDNBaseUrl): ") + OfficeLicense.OfficeInfo("CDNBaseUrl"));
+            sb.AppendLine(L.T("安装路径: ") + OfficeLicense.OfficeInfo("InstallPath"));
             sb.AppendLine();
 
             string ospp = OfficeLicense.FindOsppVbs();
-            sb.AppendLine("---- 授权环境 ----");
-            sb.AppendLine("OSPP.VBS: " + (ospp == null ? "未找到" : ospp));
+            sb.AppendLine(L.T("---- 授权环境 ----"));
+            sb.AppendLine("OSPP.VBS: " + (ospp == null ? L.T("未找到") : ospp));
             string kms = OfficeLicense.FindKmsHost();
-            sb.AppendLine("KMS 主机: " + (kms == null ? "未配置" : kms));
+            sb.AppendLine(L.T("KMS 主机: ") + (kms == null ? L.T("未配置") : kms));
             if (kms != null)
-                sb.AppendLine("KMS 1688 连通性: " + (OfficeLicense.CanConnect(kms, 1688, 1500) ? "可连接" : "连接失败"));
+                sb.AppendLine(L.T("KMS 1688 连通性: ") + (OfficeLicense.CanConnect(kms, 1688, 1500) ? L.T("可连接") : L.T("连接失败")));
             sb.AppendLine();
 
-            sb.AppendLine("---- 授权状态 ----");
+            sb.AppendLine(L.T("---- 授权状态 ----"));
             foreach (LicEntry e in OfficeLicense.Parse(txtOut.Text))
                 sb.AppendLine(OfficeLicense.FriendlyName(e.Name) + " | " + OfficeLicense.StatusText(e.Status) + " | " + (e.Grace.Length == 0 ? "-" : e.Grace) + " | " + (e.Key.Length == 0 ? "-" : e.Key));
             sb.AppendLine();
 
-            sb.AppendLine("---- OSPP 原始输出 ----");
+            sb.AppendLine(L.T("---- OSPP 原始输出 ----"));
             sb.AppendLine(txtOut.Text);
 
             SaveFileDialog sf = new SaveFileDialog();
-            sf.Filter = "文本文件 (*.txt)|*.txt";
-            sf.FileName = "Office诊断_" + DateTime.Now.ToString("yyyyMMdd_HHmm") + ".txt";
+            sf.Filter = L.T("文本文件 (*.txt)|*.txt");
+            sf.FileName = L.T("Office诊断_") + DateTime.Now.ToString("yyyyMMdd_HHmm") + ".txt";
             try { sf.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory); } catch { }
             if (sf.ShowDialog(this) != DialogResult.OK) return;
 
             try
             {
                 File.WriteAllText(sf.FileName, sb.ToString(), new UTF8Encoding(true));
-                MessageBox.Show("已保存到:\r\n" + sf.FileName, "导出成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(L.T("已保存到:\r\n") + sf.FileName, L.T("导出成功"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "保存失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(ex.Message, L.T("保存失败"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -643,19 +643,19 @@ namespace O365Installer
         {
             if (OfficeLicense.FindOsppVbs() == null)
             {
-                lblSummary.Text = "无法查询：当前 Office 未包含 OSPP.VBS";
+                lblSummary.Text = L.T("无法查询：当前 Office 未包含 OSPP.VBS");
                 lblSummary.ForeColor = Color.FromArgb(190, 120, 0);
                 lblKms.Text = "";
                 lv.Items.Clear();
                 txtOut.Text =
-                    "当前安装的 Office 目录下没有 OSPP.VBS，因此无法通过它查询或管理授权。\r\n\r\n" +
-                    "原因：OSPP.VBS 只随部分 Office 安装包提供（批量/LTSC 版通常带有），" +
-                    "订阅版或新版打包的镜像里可能不包含。\r\n\r\n" +
-                    "你可以这样做：\r\n" +
-                    "· 订阅版（Microsoft 365）：打开 Word 或 Excel，用已购买订阅的账号登录即可激活\r\n" +
-                    "· 零售永久版：打开任一 Office 应用，按提示输入 25 位产品密钥\r\n" +
-                    "· 企业批量授权：联系管理员获取 KMS 地址或 MAK 密钥\r\n\r\n" +
-                    "点下方「打开 Word」可直接启动应用去登录。";
+                    L.T("当前安装的 Office 目录下没有 OSPP.VBS，因此无法通过它查询或管理授权。\r\n\r\n") +
+                    L.T("原因：OSPP.VBS 只随部分 Office 安装包提供（批量/LTSC 版通常带有），") +
+                    L.T("订阅版或新版打包的镜像里可能不包含。\r\n\r\n") +
+                    L.T("你可以这样做：\r\n") +
+                    L.T("· 订阅版（Microsoft 365）：打开 Word 或 Excel，用已购买订阅的账号登录即可激活\r\n") +
+                    L.T("· 零售永久版：打开任一 Office 应用，按提示输入 25 位产品密钥\r\n") +
+                    L.T("· 企业批量授权：联系管理员获取 KMS 地址或 MAK 密钥\r\n\r\n") +
+                    L.T("点下方「打开 Word」可直接启动应用去登录。");
                 txtKey.Enabled = false;
                 txtKms.Enabled = false;
                 btnKey.Enabled = false;
@@ -680,7 +680,7 @@ namespace O365Installer
             try { outp = await Task.Run(delegate { return OfficeLicense.Run("/dstatus"); }); }
             catch (Exception ex)
             {
-                lblSummary.Text = "读取失败";
+                lblSummary.Text = L.T("读取失败");
                 lblSummary.ForeColor = Color.FromArgb(190, 40, 40);
                 txtOut.Text = ex.Message;
                 return;
@@ -699,7 +699,7 @@ namespace O365Installer
                 it.SubItems.Add(OfficeLicense.GraceText(e.Grace));
                 it.SubItems.Add(e.Key.Length == 0 ? "-" : e.Key);
                 it.ForeColor = OfficeLicense.StatusColor(e.Status);
-                if (OfficeLicense.StatusText(e.Status) == "已激活") licensed++;
+                if (OfficeLicense.StatusText(e.Status) == L.T("已激活")) licensed++;
                 lv.Items.Add(it);
             }
             lv.EndUpdate();
@@ -707,25 +707,25 @@ namespace O365Installer
             if (entries.Count == 0)
             {
                 string upper = outp.ToUpper();
-                if (upper.Contains("---LICENSED---")) { lblSummary.Text = "状态：已激活"; lblSummary.ForeColor = Color.FromArgb(0, 130, 60); }
-                else if (upper.Contains("---OOB_GRACE---") || upper.Contains("---OOT_GRACE---")) { lblSummary.Text = "状态：未激活（处于宽限期）"; lblSummary.ForeColor = Color.FromArgb(190, 120, 0); }
-                else if (upper.Contains("---UNLICENSED---") || upper.Contains("---NOTIFICATIONS---")) { lblSummary.Text = "状态：未激活"; lblSummary.ForeColor = Color.FromArgb(190, 40, 40); }
-                else if (outp.IndexOf("No installed product keys", StringComparison.OrdinalIgnoreCase) >= 0) { lblSummary.Text = "状态：未安装任何密钥"; lblSummary.ForeColor = Color.FromArgb(190, 40, 40); }
-                else { lblSummary.Text = "状态：未识别（见下方原文）"; lblSummary.ForeColor = Color.FromArgb(80, 85, 95); }
+                if (upper.Contains("---LICENSED---")) { lblSummary.Text = L.T("状态：已激活"); lblSummary.ForeColor = Color.FromArgb(0, 130, 60); }
+                else if (upper.Contains("---OOB_GRACE---") || upper.Contains("---OOT_GRACE---")) { lblSummary.Text = L.T("状态：未激活（处于宽限期）"); lblSummary.ForeColor = Color.FromArgb(190, 120, 0); }
+                else if (upper.Contains("---UNLICENSED---") || upper.Contains("---NOTIFICATIONS---")) { lblSummary.Text = L.T("状态：未激活"); lblSummary.ForeColor = Color.FromArgb(190, 40, 40); }
+                else if (outp.IndexOf("No installed product keys", StringComparison.OrdinalIgnoreCase) >= 0) { lblSummary.Text = L.T("状态：未安装任何密钥"); lblSummary.ForeColor = Color.FromArgb(190, 40, 40); }
+                else { lblSummary.Text = L.T("状态：未识别（见下方原文）"); lblSummary.ForeColor = Color.FromArgb(80, 85, 95); }
             }
             else if (licensed == entries.Count)
             {
-                lblSummary.Text = "状态：已激活（" + licensed + " 个产品）";
+                lblSummary.Text = L.T("状态：已激活（") + licensed + L.T(" 个产品）");
                 lblSummary.ForeColor = Color.FromArgb(0, 130, 60);
             }
             else if (licensed == 0)
             {
-                lblSummary.Text = "状态：未激活（0 / " + entries.Count + " 个产品已激活）";
+                lblSummary.Text = L.T("状态：未激活（0 / ") + entries.Count + L.T(" 个产品已激活）");
                 lblSummary.ForeColor = Color.FromArgb(190, 40, 40);
             }
             else
             {
-                lblSummary.Text = "状态：部分激活（" + licensed + " / " + entries.Count + " 个产品）";
+                lblSummary.Text = L.T("状态：部分激活（") + licensed + " / " + entries.Count + L.T(" 个产品）");
                 lblSummary.ForeColor = Color.FromArgb(190, 120, 0);
             }
 
@@ -733,7 +733,7 @@ namespace O365Installer
 
             if (outp.IndexOf("0x4004F00C", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                lblSummary.Text = "状态：无法判定 — Office 应用正在运行，请关闭后刷新";
+                lblSummary.Text = L.T("状态：无法判定 — Office 应用正在运行，请关闭后刷新");
                 lblSummary.ForeColor = Color.FromArgb(190, 120, 0);
             }
         }
@@ -743,7 +743,7 @@ namespace O365Installer
             string host = OfficeLicense.FindKmsHost();
             if (host == null)
             {
-                lblKms.Text = "KMS 主机：未配置（零售版或订阅版属正常状态）";
+                lblKms.Text = L.T("KMS 主机：未配置（零售版或订阅版属正常状态）");
                 lblKms.ForeColor = Color.FromArgb(120, 125, 135);
                 return;
             }
@@ -751,12 +751,12 @@ namespace O365Installer
             bool ok = OfficeLicense.CanConnect(host, 1688, 1500);
             if (ok)
             {
-                lblKms.Text = "KMS 主机：" + host + "（1688 端口可连接）";
+                lblKms.Text = L.T("KMS 主机：") + host + L.T("（1688 端口可连接）");
                 lblKms.ForeColor = Color.FromArgb(0, 130, 60);
             }
             else
             {
-                lblKms.Text = "KMS 主机：" + host + "（1688 端口连接失败，可能是已失效的残留配置）";
+                lblKms.Text = L.T("KMS 主机：") + host + L.T("（1688 端口连接失败，可能是已失效的残留配置）");
                 lblKms.ForeColor = Color.FromArgb(190, 120, 0);
                 if (txtKms.Text.Length == 0) txtKms.Text = host;
             }
@@ -767,7 +767,7 @@ namespace O365Installer
             string key = txtKey.Text.Trim().Replace(" ", "");
             if (key.Length < 20)
             {
-                MessageBox.Show("请输入完整的 25 位产品密钥。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(L.T("请输入完整的 25 位产品密钥。"), L.T("提示"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             SetBusy(true);
@@ -782,7 +782,7 @@ namespace O365Installer
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "安装密钥失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(ex.Message, L.T("安装密钥失败"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally { SetBusy(false); }
         }
@@ -792,7 +792,7 @@ namespace O365Installer
             string host = txtKms.Text.Trim();
             if (host.Length == 0)
             {
-                MessageBox.Show("请填写 KMS 主机地址（例如 kms.contoso.com）。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(L.T("请填写 KMS 主机地址（例如 kms.contoso.com）。"), L.T("提示"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             SetBusy(true);
@@ -806,7 +806,7 @@ namespace O365Installer
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "设置 KMS 失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(ex.Message, L.T("设置 KMS 失败"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally { SetBusy(false); }
         }

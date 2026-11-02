@@ -16,8 +16,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyVersion("1.0.3.0")]
-[assembly: AssemblyFileVersion("1.0.3.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace O365Installer
 {
@@ -111,7 +111,7 @@ namespace O365Installer
                 }
                 catch
                 {
-                    MessageBox.Show("需要管理员权限才能安装 Office，请在弹窗中点击\"是\"。", "Office 安装器",
+                    MessageBox.Show(L.T("需要管理员权限才能安装 Office，请在弹窗中点击\"是\"。"), L.T("Office 安装器"),
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
                 return;
@@ -123,7 +123,7 @@ namespace O365Installer
             Mutex single = new Mutex(true, "Global\\O365Installer_SingleRun", out createdNew);
             if (!createdNew && !uiTest2)
             {
-                MessageBox.Show("安装器已经在运行，请勿重复打开。", "Office 安装器",
+                MessageBox.Show(L.T("安装器已经在运行，请勿重复打开。"), L.T("Office 安装器"),
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -262,20 +262,41 @@ namespace O365Installer
 
         static string LangLabel(string code)
         {
-            string name;
-            if (!LangNames.TryGetValue(code, out name))
+            string name = null;
+            if (L.Index == 0) LangNames.TryGetValue(code, out name);
+            if (string.IsNullOrEmpty(name))
             {
                 try
                 {
                     CultureInfo ci = CultureInfo.GetCultureInfo(code);
-                    name = ci.DisplayName;
-                    if (string.IsNullOrEmpty(name) || string.Equals(name, code, StringComparison.OrdinalIgnoreCase))
-                        name = ci.NativeName;
+                    name = L.Index == 1 ? ci.EnglishName : ci.NativeName;
                 }
-                catch { name = code; }
+                catch { }
             }
             if (string.IsNullOrEmpty(name)) name = code;
             return name + "  (" + code + ")";
+        }
+
+        void OnUiLangChanged()
+        {
+            if (applying || cbUiLang == null) return;
+            L.SetLang(cbUiLang.SelectedIndex);
+
+            int prod = cbProduct.SelectedIndex;
+            int lang = cbLang.SelectedIndex;
+            applying = true;
+            cbProduct.Items.Clear();
+            foreach (ProductDef p in catalog) cbProduct.Items.Add(L.T(p.Name));
+            cbProduct.SelectedIndex = prod;
+            cbLang.Items.Clear();
+            foreach (string code in LangCodes) cbLang.Items.Add(LangLabel(code));
+            cbLang.SelectedIndex = lang;
+            applying = false;
+
+            foreach (Form fm in Application.OpenForms) L.Apply(fm);
+            if (lblHint != null) lblHint.Text = HintText();
+            if (lblSourcePath != null) lblSourcePath.Text = L.T("安装源将下载到:\n") + Path.Combine(WorkDir, "source");
+            ToggleMode();
         }
 
         static string CodeFromLabel(string label)
@@ -286,7 +307,7 @@ namespace O365Installer
             return label.Trim();
         }
 
-        ComboBox cbProduct, cbLang, cbArch;
+        ComboBox cbProduct, cbLang, cbArch, cbUiLang;
         TextBox tbUrl;
         CheckBox chkKeep;
         RadioButton rbImg, rbOdt;
@@ -333,7 +354,7 @@ namespace O365Installer
         void BuildUi()
         {
             Font f = new Font("Microsoft YaHei UI", 9F);
-            Text = "Office 离线安装器";
+            Text = L.T("Office 离线安装器");
             ClientSize = new Size(744, 606);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -342,47 +363,56 @@ namespace O365Installer
             BackColor = Color.FromArgb(248, 249, 251);
 
             Label title = new Label();
-            title.Text = "Office 离线安装器";
+            title.Text = L.T("Office 离线安装器");
             title.Font = new Font("Microsoft YaHei UI", 15F, FontStyle.Bold);
             title.Location = new Point(16, 12);
             title.AutoSize = true;
             Controls.Add(title);
 
             Label sub = new Label();
-            sub.Text = "Office 2016–2024 与 Microsoft 365，支持官方离线镜像和 ODT 在线下载";
+            sub.Text = L.T("Office 2016–2024 与 Microsoft 365，支持官方离线镜像和 ODT 在线下载");
             sub.ForeColor = Color.FromArgb(120, 125, 135);
             sub.Location = new Point(18, 42);
             sub.AutoSize = true;
             Controls.Add(sub);
 
+            cbUiLang = new ComboBox();
+            cbUiLang.DropDownStyle = ComboBoxStyle.DropDownList;
+            cbUiLang.Location = new Point(596, 16);
+            cbUiLang.Size = new Size(132, 24);
+            for (int i = 0; i < L.NativeNames.Length; i++) cbUiLang.Items.Add(L.NativeNames[i]);
+            cbUiLang.SelectedIndex = L.Index;
+            cbUiLang.SelectedIndexChanged += delegate { OnUiLangChanged(); };
+            Controls.Add(cbUiLang);
+
             GroupBox g1 = new GroupBox();
-            g1.Text = "安装选项";
+            g1.Text = L.T("安装选项");
             g1.Location = new Point(16, 68);
             g1.Size = new Size(336, 168);
             Controls.Add(g1);
 
-            AddLabel(g1, "产品", 14, 30);
+            AddLabel(g1, L.T("产品"), 14, 30);
             cbProduct = new ComboBox();
             cbProduct.DropDownStyle = ComboBoxStyle.DropDownList;
             cbProduct.Location = new Point(60, 26);
             cbProduct.Size = new Size(258, 24);
             cbProduct.DropDownWidth = 340;
             cbProduct.MaxDropDownItems = 20;
-            foreach (ProductDef p in catalog) cbProduct.Items.Add(p.Name);
+            foreach (ProductDef p in catalog) cbProduct.Items.Add(L.T(p.Name));
             cbProduct.SelectedIndex = 0;
             if (UiTestProductIndex >= 0 && UiTestProductIndex < catalog.Count) cbProduct.SelectedIndex = UiTestProductIndex;
             g1.Controls.Add(cbProduct);
 
-            AddLabel(g1, "语言", 14, 66);
+            AddLabel(g1, L.T("语言"), 14, 66);
             cbLang = new ComboBox();
             cbLang.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbLang.Location = new Point(60, 62);
-            cbLang.Size = new Size(150, 24);
+            cbLang.Location = new Point(76, 62);
+            cbLang.Size = new Size(134, 24);
             cbLang.DropDownWidth = 240;
             g1.Controls.Add(cbLang);
             FillLanguages();
 
-            AddLabel(g1, "位数", 220, 66);
+            AddLabel(g1, L.T("位数"), 220, 66);
             cbArch = new ComboBox();
             cbArch.DropDownStyle = ComboBoxStyle.DropDownList;
             cbArch.Location = new Point(258, 62);
@@ -412,26 +442,26 @@ namespace O365Installer
             cbLang.SelectedIndexChanged += delegate { if (!applying) AutoFillUrl(); };
 
             GroupBox g2 = new GroupBox();
-            g2.Text = "安装源";
+            g2.Text = L.T("安装源");
             g2.Location = new Point(364, 68);
             g2.Size = new Size(364, 168);
             Controls.Add(g2);
 
             rbImg = new RadioButton();
-            rbImg.Text = "离线镜像 (.img)";
+            rbImg.Text = L.T("离线镜像 (.img)");
             rbImg.Location = new Point(14, 22);
             rbImg.AutoSize = true;
             rbImg.Checked = true;
             g2.Controls.Add(rbImg);
 
             rbOdt = new RadioButton();
-            rbOdt.Text = "ODT 在线下载";
-            rbOdt.Location = new Point(168, 22);
+            rbOdt.Text = L.T("ODT 在线下载");
+            rbOdt.Location = new Point(206, 22);
             rbOdt.AutoSize = true;
             g2.Controls.Add(rbOdt);
 
             lblUrl = new Label();
-            lblUrl.Text = "镜像链接 (.img)";
+            lblUrl.Text = L.T("镜像链接 (.img)");
             lblUrl.Location = new Point(14, 52);
             lblUrl.AutoSize = true;
             g2.Controls.Add(lblUrl);
@@ -443,7 +473,7 @@ namespace O365Installer
             g2.Controls.Add(tbUrl);
 
             lblSourcePath = new Label();
-            lblSourcePath.Text = "安装源将下载到: " + Path.Combine(WorkDir, "source");
+            lblSourcePath.Text = L.T("安装源将下载到: ") + Path.Combine(WorkDir, "source");
             lblSourcePath.ForeColor = Color.FromArgb(120, 125, 135);
             lblSourcePath.Font = new Font("Microsoft YaHei UI", 8F);
             lblSourcePath.Location = new Point(14, 52);
@@ -453,13 +483,13 @@ namespace O365Installer
             g2.Controls.Add(lblSourcePath);
 
             chkKeep = new CheckBox();
-            chkKeep.Text = "完成后保留安装源（便于给其他电脑用）";
+            chkKeep.Text = L.T("完成后保留安装源（便于给其他电脑用）");
             chkKeep.Location = new Point(14, 102);
             chkKeep.AutoSize = true;
             g2.Controls.Add(chkKeep);
 
             Label l5 = new Label();
-            l5.Text = "临时文件: " + WorkDir;
+            l5.Text = L.T("临时文件: ") + WorkDir;
             l5.ForeColor = Color.FromArgb(120, 125, 135);
             l5.Font = new Font("Microsoft YaHei UI", 8F);
             l5.Location = new Point(14, 141);
@@ -472,7 +502,7 @@ namespace O365Installer
             ToggleMode();
 
             GroupBox g3 = new GroupBox();
-            g3.Text = "要安装的组件（取消勾选 = 不安装）";
+            g3.Text = L.T("要安装的组件（取消勾选 = 不安装）");
             g3.Location = new Point(16, 246);
             g3.Size = new Size(712, 96);
             Controls.Add(g3);
@@ -499,7 +529,7 @@ namespace O365Installer
             Controls.Add(bar);
 
             lblStatus = new Label();
-            lblStatus.Text = "就绪";
+            lblStatus.Text = L.T("就绪");
             lblStatus.Location = new Point(16, 372);
             lblStatus.Size = new Size(712, 20);
             lblStatus.ForeColor = Color.FromArgb(80, 85, 95);
@@ -516,7 +546,7 @@ namespace O365Installer
             Controls.Add(log);
 
             btnStart = new Button();
-            btnStart.Text = "开始安装";
+            btnStart.Text = L.T("开始安装");
             btnStart.Location = new Point(534, 556);
             btnStart.Size = new Size(104, 34);
             btnStart.BackColor = Color.FromArgb(0, 120, 212);
@@ -527,21 +557,21 @@ namespace O365Installer
             Controls.Add(btnStart);
 
             btnCancel = new Button();
-            btnCancel.Text = "取消";
+            btnCancel.Text = L.T("取消");
             btnCancel.Location = new Point(646, 556);
             btnCancel.Size = new Size(82, 34);
             btnCancel.Enabled = false;
             btnCancel.Click += delegate
             {
                 if (cts != null) cts.Cancel();
-                lblStatus.Text = "正在取消...";
+                lblStatus.Text = L.T("正在取消...");
             };
             Controls.Add(btnCancel);
 
             btnLog = new Button();
-            btnLog.Text = "打开日志目录";
+            btnLog.Text = L.T("打开日志目录");
             btnLog.Location = new Point(16, 556);
-            btnLog.Size = new Size(110, 34);
+            btnLog.Size = new Size(116, 34);
             btnLog.Click += delegate
             {
                 string d = Directory.Exists(LogDir) ? LogDir : WorkDir;
@@ -550,9 +580,9 @@ namespace O365Installer
             Controls.Add(btnLog);
 
             Button btnLicense = new Button();
-            btnLicense.Text = "授权管理";
-            btnLicense.Location = new Point(136, 556);
-            btnLicense.Size = new Size(110, 34);
+            btnLicense.Text = L.T("授权管理");
+            btnLicense.Location = new Point(140, 556);
+            btnLicense.Size = new Size(116, 34);
             btnLicense.Click += delegate
             {
                 using (LicenseForm lf = new LicenseForm())
@@ -563,9 +593,9 @@ namespace O365Installer
             Controls.Add(btnLicense);
 
             Button btnUninstall = new Button();
-            btnUninstall.Text = "卸载旧版";
-            btnUninstall.Location = new Point(256, 556);
-            btnUninstall.Size = new Size(110, 34);
+            btnUninstall.Text = L.T("卸载旧版");
+            btnUninstall.Location = new Point(264, 556);
+            btnUninstall.Size = new Size(126, 34);
             btnUninstall.Click += delegate
             {
                 using (UninstallForm uf = new UninstallForm())
@@ -576,9 +606,9 @@ namespace O365Installer
             Controls.Add(btnUninstall);
 
             Button btnAbout = new Button();
-            btnAbout.Text = "声明";
-            btnAbout.Location = new Point(366, 556);
-            btnAbout.Size = new Size(80, 34);
+            btnAbout.Text = L.T("声明");
+            btnAbout.Location = new Point(398, 556);
+            btnAbout.Size = new Size(90, 34);
             btnAbout.Click += delegate
             {
                 using (ConsentForm cf = new ConsentForm(false)) cf.ShowDialog(this);
@@ -609,7 +639,7 @@ namespace O365Installer
             {
                 if (busy)
                 {
-                    DialogResult r = MessageBox.Show("安装正在进行，确定要退出吗？", "确认", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                    DialogResult r = MessageBox.Show(L.T("安装正在进行，确定要退出吗？"), L.T("确认"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                     if (r != DialogResult.Yes) e.Cancel = true;
                     else if (cts != null) cts.Cancel();
                 }
@@ -620,12 +650,12 @@ namespace O365Installer
         {
             ProductDef p = SelectedProduct;
             if (p == null) return "";
-            string head = "产品 ID: " + p.Id + "    更新通道: " + p.Channel + Environment.NewLine;
+            string head = L.T("产品 ID: ") + p.Id + L.T("    更新通道: ") + p.Channel + Environment.NewLine;
             if (p.Img)
-                return head + "该产品有微软官方离线镜像，可选镜像或 ODT 下载。";
+                return head + L.T("该产品有微软官方离线镜像，可选镜像或 ODT 下载。");
 
-            string line2 = "该产品无官方离线镜像，只能 ODT 在线下载。";
-            if (p.Family == "Office 2016") line2 = "该产品无官方离线镜像，只能 ODT 在线下载（2016 为实验性支持）。";
+            string line2 = L.T("该产品无官方离线镜像，只能 ODT 在线下载。");
+            if (p.Family == "Office 2016") line2 = L.T("该产品无官方离线镜像，只能 ODT 在线下载（2016 为实验性支持）。");
             return head + line2;
         }
 
@@ -662,16 +692,16 @@ namespace O365Installer
             tbUrl.Visible = useImg;
             lblSourcePath.Visible = !useImg;
             chkKeep.Text = useImg
-                ? "完成后保留镜像文件（可重复使用）"
-                : "完成后保留下载的安装文件（可重复使用）";
+                ? L.T("完成后保留镜像文件（可重复使用）")
+                : L.T("完成后保留下载的安装文件（可重复使用）");
 
             lblHint.ForeColor = HintColor();
             lblHint.Text = HintText();
             if (!useImg)
             {
-                string tip = "安装源将下载到:\n" + Path.Combine(WorkDir, "source");
+                string tip = L.T("安装源将下载到:\n") + Path.Combine(WorkDir, "source");
                 if (p != null && p.Family == "Office 2016")
-                    tip += "\n（2016 无离线镜像，必须联网下载）";
+                    tip += L.T("\n（2016 无离线镜像，必须联网下载）");
                 lblSourcePath.Text = tip;
             }
 
@@ -767,12 +797,12 @@ namespace O365Installer
             string url = tbUrl.Text.Trim();
             if (!url.StartsWith("http"))
             {
-                MessageBox.Show("镜像链接不正确。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(L.T("镜像链接不正确。"), L.T("提示"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             if (!checks["Word"].Checked && !checks["Excel"].Checked && !checks["PowerPoint"].Checked)
             {
-                DialogResult r = MessageBox.Show("没有勾选任何核心组件，确定继续？", "确认", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                DialogResult r = MessageBox.Show(L.T("没有勾选任何核心组件，确定继续？"), L.T("确认"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (r != DialogResult.Yes) return;
             }
 
@@ -785,14 +815,14 @@ namespace O365Installer
             }
             catch (OperationCanceledException)
             {
-                Log("已取消", Color.FromArgb(190, 120, 0));
-                ReportText("已取消");
+                Log(L.T("已取消"), Color.FromArgb(190, 120, 0));
+                ReportText(L.T("已取消"));
             }
             catch (Exception ex)
             {
-                Log("出错: " + ex.Message, Color.FromArgb(190, 40, 40));
-                ReportText("已停止: " + ex.Message);
-                MessageBox.Show(ex.Message, "安装未完成", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Log(L.T("出错: ") + ex.Message, Color.FromArgb(190, 40, 40));
+                ReportText(L.T("已停止: ") + ex.Message);
+                MessageBox.Show(ex.Message, L.T("安装未完成"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -803,7 +833,7 @@ namespace O365Installer
         async Task InstallAsync(string url, CancellationToken ct)
         {
             ProductDef prod = SelectedProduct;
-            if (prod == null) throw new Exception("请先选择要安装的产品。");
+            if (prod == null) throw new Exception(L.T("请先选择要安装的产品。"));
 
             string lang = SelectedLang;
             string arch = cbArch.SelectedItem.ToString();
@@ -819,27 +849,27 @@ namespace O365Installer
             Directory.CreateDirectory(WorkDir);
             Directory.CreateDirectory(LogDir);
 
-            Report(2, "检查系统环境...");
-            Log("产品: " + prod.Name + "  (" + prod.Id + ")");
-            Log("通道: " + prod.Channel + "   语言: " + lang + "   " + arch + " 位   方式: " + (useImg ? "离线镜像" : "ODT 下载"));
-            if (arch == "64" && !Environment.Is64BitOperatingSystem) throw new Exception("当前系统不是 64 位，无法安装 64 位 Office。");
+            Report(2, L.T("检查系统环境..."));
+            Log(L.T("产品: ") + prod.Name + "  (" + prod.Id + ")");
+            Log(L.T("通道: ") + prod.Channel + L.T("   语言: ") + lang + "   " + arch + L.T(" 位   方式: ") + (useImg ? L.T("离线镜像") : L.T("ODT 下载")));
+            if (arch == "64" && !Environment.Is64BitOperatingSystem) throw new Exception(L.T("当前系统不是 64 位，无法安装 64 位 Office。"));
 
             long needGB = 13;
             if (prod.SingleApp || prod.Id.StartsWith("Visio") || prod.Id.StartsWith("Project")) needGB = 6;
             long freeGB = new DriveInfo("C").AvailableFreeSpace / (1024L * 1024 * 1024);
-            Log("C 盘可用空间: " + freeGB + " GB，需要约 " + needGB + " GB");
-            if (freeGB < needGB) throw new Exception("C 盘空间不足，至少需要 " + needGB + " GB，当前 " + freeGB + " GB。");
+            Log(L.T("C 盘可用空间: ") + freeGB + L.T(" GB，需要约 ") + needGB + " GB");
+            if (freeGB < needGB) throw new Exception(L.T("C 盘空间不足，至少需要 ") + needGB + L.T(" GB，当前 ") + freeGB + " GB。");
 
-            Report(5, "检测已安装的 Office...");
+            Report(5, L.T("检测已安装的 Office..."));
             List<string> old = DetectOffice();
             if (old.Count > 0)
             {
-                foreach (string o in old) Log("发现: " + o, Color.FromArgb(190, 120, 0));
-                Log("提示：安装前如需卸载旧版，请点主界面「卸载旧版」按钮单独处理（本流程不会动已有 Office）", Color.FromArgb(0, 120, 212));
+                foreach (string o in old) Log(L.T("发现: ") + o, Color.FromArgb(190, 120, 0));
+                Log(L.T("提示：安装前如需卸载旧版，请点主界面「卸载旧版」按钮单独处理（本流程不会动已有 Office）"), Color.FromArgb(0, 120, 212));
             }
             else
             {
-                Log("未发现已安装的 Office");
+                Log(L.T("未发现已安装的 Office"));
             }
 
             if (useImg)
@@ -862,21 +892,21 @@ namespace O365Installer
                 }
                 catch (CorruptImageException ex)
                 {
-                    Log("镜像校验失败: " + ex.Message, Color.FromArgb(190, 40, 40));
+                    Log(L.T("镜像校验失败: ") + ex.Message, Color.FromArgb(190, 40, 40));
                     try
                     {
                         if (File.Exists(img)) File.Delete(img);
                         if (File.Exists(meta)) File.Delete(meta);
-                        Log("已自动删除损坏的镜像", Color.FromArgb(190, 120, 0));
+                        Log(L.T("已自动删除损坏的镜像"), Color.FromArgb(190, 120, 0));
                     }
                     catch
                     {
-                        Log("镜像删除失败，请手动删除: " + img, Color.FromArgb(190, 40, 40));
+                        Log(L.T("镜像删除失败，请手动删除: ") + img, Color.FromArgb(190, 40, 40));
                         throw;
                     }
                     if (pass == 2)
-                        throw new Exception("镜像重新下载后仍然校验失败，请检查网络或更换安装源。");
-                    Log("开始重新下载镜像...", Color.FromArgb(0, 120, 212));
+                        throw new Exception(L.T("镜像重新下载后仍然校验失败，请检查网络或更换安装源。"));
+                    Log(L.T("开始重新下载镜像..."), Color.FromArgb(0, 120, 212));
                 }
             }
         }
@@ -897,7 +927,7 @@ namespace O365Installer
                 {
                     File.Move(legacy, img);
                     File.WriteAllText(meta, new FileInfo(img).Length.ToString(), new UTF8Encoding(false));
-                    Log("发现旧命名镜像，已按当前选择（" + lang + "/x" + arch + "）复用；若语言不符请删除后重下", Color.FromArgb(190, 120, 0));
+                    Log(L.T("发现旧命名镜像，已按当前选择（") + lang + "/x" + arch + L.T("）复用；若语言不符请删除后重下"), Color.FromArgb(190, 120, 0));
                 }
                 catch { }
             }
@@ -912,33 +942,33 @@ namespace O365Installer
 
                 if (want > 0 && sz == want)
                 {
-                    Log("镜像已完整: " + szGB.ToString("F2") + " GB，跳过下载");
+                    Log(L.T("镜像已完整: ") + szGB.ToString("F2") + L.T(" GB，跳过下载"));
                     needDl = false;
                 }
                 else if (want > 0 && sz < want)
                 {
-                    Log("镜像未下载完: " + szGB.ToString("F2") + " / " + (want / 1024.0 / 1024 / 1024).ToString("F2") + " GB，将断点续传");
+                    Log(L.T("镜像未下载完: ") + szGB.ToString("F2") + " / " + (want / 1024.0 / 1024 / 1024).ToString("F2") + L.T(" GB，将断点续传"));
                 }
                 else if (want > 0 && sz > want)
                 {
-                    Log("镜像大小异常（比预期大），删除后重新下载", Color.FromArgb(190, 120, 0));
+                    Log(L.T("镜像大小异常（比预期大），删除后重新下载"), Color.FromArgb(190, 120, 0));
                     try { File.Delete(img); File.Delete(meta); } catch { }
                 }
                 else if (sz > 3L * 1024 * 1024 * 1024)
                 {
-                    Log("镜像已存在: " + szGB.ToString("F2") + " GB（无大小记录），按完整处理");
+                    Log(L.T("镜像已存在: ") + szGB.ToString("F2") + L.T(" GB（无大小记录），按完整处理"));
                     needDl = false;
                 }
                 else
                 {
-                    Log("发现未完成的镜像 (" + (sz / 1024.0 / 1024).ToString("F1") + " MB)，将断点续传");
+                    Log(L.T("发现未完成的镜像 (") + (sz / 1024.0 / 1024).ToString("F1") + L.T(" MB)，将断点续传"));
                 }
             }
 
             if (needDl)
             {
-                Report(8, "准备下载镜像...");
-                Log("开始下载镜像（约 4.6 GB，支持断点续传）");
+                Report(8, L.T("准备下载镜像..."));
+                Log(L.T("开始下载镜像（约 4.6 GB，支持断点续传）"));
                 string u = url;
                 string m = meta;
                 await Task.Run(delegate { Download(u, img, m, ct); });
@@ -947,17 +977,17 @@ namespace O365Installer
                 long totalSize = 0;
                 try { long.TryParse(File.ReadAllText(meta).Trim(), out totalSize); } catch { }
                 if (totalSize > 0 && finalSize != totalSize)
-                    throw new Exception("镜像下载不完整（" + (finalSize / 1024.0 / 1024 / 1024).ToString("F2") + " / " + (totalSize / 1024.0 / 1024 / 1024).ToString("F2") + " GB），重新运行可继续下载。");
+                    throw new Exception(L.T("镜像下载不完整（") + (finalSize / 1024.0 / 1024 / 1024).ToString("F2") + " / " + (totalSize / 1024.0 / 1024 / 1024).ToString("F2") + L.T(" GB），重新运行可继续下载。"));
                 if (finalSize < 3L * 1024 * 1024 * 1024)
-                    throw new Exception("镜像下载不完整，可重新运行继续下载。");
-                Log("下载完成: " + (finalSize / 1024.0 / 1024 / 1024).ToString("F2") + " GB", Color.FromArgb(0, 130, 60));
+                    throw new Exception(L.T("镜像下载不完整，可重新运行继续下载。"));
+                Log(L.T("下载完成: ") + (finalSize / 1024.0 / 1024 / 1024).ToString("F2") + " GB", Color.FromArgb(0, 130, 60));
             }
 
             Exception pending = null;
             try
             {
-                Report(90, "挂载镜像...");
-                Log("正在挂载镜像");
+                Report(90, L.T("挂载镜像..."));
+                Log(L.T("正在挂载镜像"));
                 drive = await Task.Run(delegate { return MountImage(img); });
                 if (drive == null)
                 {
@@ -965,28 +995,28 @@ namespace O365Installer
                     long wantNow = 0;
                     try { long.TryParse(File.ReadAllText(meta).Trim(), out wantNow); } catch { }
                     if (wantNow > 0 && szNow != wantNow)
-                        throw new CorruptImageException("镜像大小与预期不符（" + szNow + " / " + wantNow + " 字节）");
-                    throw new Exception("挂载镜像失败，未获得盘符。请确认镜像文件完整、且不在网络盘上。");
+                        throw new CorruptImageException(L.T("镜像大小与预期不符（") + szNow + " / " + wantNow + L.T(" 字节）"));
+                    throw new Exception(L.T("挂载镜像失败，未获得盘符。请确认镜像文件完整、且不在网络盘上。"));
                 }
                 mounted = true;
-                Log("镜像已挂载为 " + drive + ": 盘");
+                Log(L.T("镜像已挂载为 ") + drive + L.T(": 盘"));
 
                 string setupExe = drive + ":\\setup.exe";
-                if (!File.Exists(setupExe)) throw new CorruptImageException("镜像内未找到 setup.exe");
+                if (!File.Exists(setupExe)) throw new CorruptImageException(L.T("镜像内未找到 setup.exe"));
 
                 string dataCab = drive + ":\\Office\\Data\\v" + arch + ".cab";
                 if (!File.Exists(dataCab))
-                    throw new CorruptImageException("镜像内缺少 Office\\Data\\v" + arch + ".cab");
+                    throw new CorruptImageException(L.T("镜像内缺少 Office\\Data\\v") + arch + ".cab");
 
-                Report(93, "生成安装配置...");
+                Report(93, L.T("生成安装配置..."));
                 string xml = BuildConfigXml(prod.Id, lang, arch, drive + ":\\", exclude, LogDir, prod.Channel);
                 File.WriteAllText(cfgPath, xml, new UTF8Encoding(false));
-                Log("已生成配置，排除组件: " + (exclude.Count == 0 ? "无" : string.Join(", ", exclude.ToArray())));
+                Log(L.T("已生成配置，排除组件: ") + (exclude.Count == 0 ? L.T("无") : string.Join(", ", exclude.ToArray())));
 
-                Report(95, "正在安装...");
-                Log("调用 setup.exe 安装，安装窗口中的进度即为实际进度");
+                Report(95, L.T("正在安装..."));
+                Log(L.T("调用 setup.exe 安装，安装窗口中的进度即为实际进度"));
                 int rc = await RunInstallWithRetry(setupExe, "/configure \"" + cfgPath + "\"", drive + ":\\", ct);
-                if (rc != 0) throw new Exception("安装未成功，返回码 " + rc + "。请查看日志目录。常见原因：与旧版 Office 冲突、安全软件拦截、空间不足。");
+                if (rc != 0) throw new Exception(L.T("安装未成功，返回码 ") + rc + L.T("。请查看日志目录。常见原因：与旧版 Office 冲突、安全软件拦截、空间不足。"));
             }
             catch (Exception ex)
             {
@@ -995,38 +1025,38 @@ namespace O365Installer
 
             if (mounted)
             {
-                Report(97, "卸载镜像...");
+                Report(97, L.T("卸载镜像..."));
                 await Task.Run(delegate { DismountImage(img); });
                 mounted = false;
                 await Task.Delay(800);
             }
             if (pending != null) throw pending;
 
-            Report(99, "校验安装结果...");
+            Report(99, L.T("校验安装结果..."));
             string ver = GetInstalledVersion();
-            if (!string.IsNullOrEmpty(ver)) Log("安装成功，当前版本 " + ver, Color.FromArgb(0, 130, 60));
-            else Log("安装进程成功，但未读出版本号，请手动打开 Word 确认。", Color.FromArgb(190, 120, 0));
+            if (!string.IsNullOrEmpty(ver)) Log(L.T("安装成功，当前版本 ") + ver, Color.FromArgb(0, 130, 60));
+            else Log(L.T("安装进程成功，但未读出版本号，请手动打开 Word 确认。"), Color.FromArgb(190, 120, 0));
 
             if (!keepSource)
             {
                 try
                 {
                     File.Delete(img);
-                    Log("已删除镜像，释放约 4.6 GB");
+                    Log(L.T("已删除镜像，释放约 4.6 GB"));
                 }
                 catch
                 {
-                    Log("镜像删除失败，可手动删除: " + img, Color.FromArgb(190, 120, 0));
+                    Log(L.T("镜像删除失败，可手动删除: ") + img, Color.FromArgb(190, 120, 0));
                 }
             }
             else
             {
-                Log("镜像已保留: " + img);
+                Log(L.T("镜像已保留: ") + img);
             }
 
-            Report(100, "安装完成");
-            MessageBox.Show(prod.Name + " 安装完成。" + Environment.NewLine + "首次打开 Word / Excel 时按提示登录账号即可激活。",
-                "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Report(100, L.T("安装完成"));
+            MessageBox.Show(prod.Name + L.T(" 安装完成。") + Environment.NewLine + L.T("首次打开 Word / Excel 时按提示登录账号即可激活。"),
+                L.T("完成"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         async Task InstallFromOdt(ProductDef prod, string lang, string arch, List<string> exclude, bool keepSource, CancellationToken ct)
@@ -1034,14 +1064,14 @@ namespace O365Installer
             string odtDir = Path.Combine(WorkDir, "odt");
             string srcDir = Path.Combine(WorkDir, "source");
 
-            Report(8, "准备部署工具...");
-            Log("正在获取微软官方 Office 部署工具 (ODT)");
+            Report(8, L.T("准备部署工具..."));
+            Log(L.T("正在获取微软官方 Office 部署工具 (ODT)"));
             Action<string> odtLog = new Action<string>(Log);
             string setupExe = await Task.Run(delegate { return OdtTools.Ensure(odtDir, odtLog, ct); });
-            Log("部署工具就绪: " + setupExe, Color.FromArgb(0, 130, 60));
+            Log(L.T("部署工具就绪: ") + setupExe, Color.FromArgb(0, 130, 60));
 
-            Report(15, "下载安装文件...");
-            Log("开始从微软 CDN 下载安装文件到: " + srcDir);
+            Report(15, L.T("下载安装文件..."));
+            Log(L.T("开始从微软 CDN 下载安装文件到: ") + srcDir);
             string dlXml = BuildConfigXml(prod.Id, lang, arch, srcDir, exclude, LogDir, prod.Channel);
             string dlPath = Path.Combine(WorkDir, "download.xml");
             File.WriteAllText(dlPath, dlXml, new UTF8Encoding(false));
@@ -1050,47 +1080,47 @@ namespace O365Installer
             int drc = await Task.Run(delegate { return RunOdtDownload(setupExe, dlPath, srcDir, swDl, ct); });
             if (drc != 0)
             {
-                if (drc == 1603) throw new Exception("下载返回 1603：产品 ID 或通道不被支持，请检查所选产品。");
-                throw new Exception("下载安装文件失败，返回码 " + drc + "。请查看日志目录。");
+                if (drc == 1603) throw new Exception(L.T("下载返回 1603：产品 ID 或通道不被支持，请检查所选产品。"));
+                throw new Exception(L.T("下载安装文件失败，返回码 ") + drc + L.T("。请查看日志目录。"));
             }
-            Log("安装文件下载完成，共 " + DirSizeGB(srcDir).ToString("F2") + " GB", Color.FromArgb(0, 130, 60));
+            Log(L.T("安装文件下载完成，共 ") + DirSizeGB(srcDir).ToString("F2") + " GB", Color.FromArgb(0, 130, 60));
 
-            Report(88, "生成安装配置...");
+            Report(88, L.T("生成安装配置..."));
             string instXml = BuildConfigXml(prod.Id, lang, arch, srcDir, exclude, LogDir, prod.Channel);
             string instPath = Path.Combine(WorkDir, "install.xml");
             File.WriteAllText(instPath, instXml, new UTF8Encoding(false));
-            Log("已生成配置，排除组件: " + (exclude.Count == 0 ? "无" : string.Join(", ", exclude.ToArray())));
+            Log(L.T("已生成配置，排除组件: ") + (exclude.Count == 0 ? L.T("无") : string.Join(", ", exclude.ToArray())));
 
-            Report(92, "正在安装...");
-            Log("调用 setup.exe 安装，安装窗口中的进度即为实际进度");
+            Report(92, L.T("正在安装..."));
+            Log(L.T("调用 setup.exe 安装，安装窗口中的进度即为实际进度"));
             int rc = await RunInstallWithRetry(setupExe, "/configure \"" + instPath + "\"", odtDir, ct);
-            if (rc != 0) throw new Exception("安装未成功，返回码 " + rc + "。请查看日志目录。");
+            if (rc != 0) throw new Exception(L.T("安装未成功，返回码 ") + rc + L.T("。请查看日志目录。"));
 
-            Report(99, "校验安装结果...");
+            Report(99, L.T("校验安装结果..."));
             string ver = GetInstalledVersion();
-            if (!string.IsNullOrEmpty(ver)) Log("安装成功，当前版本 " + ver, Color.FromArgb(0, 130, 60));
-            else Log("安装进程成功，但未读出版本号，请手动打开 Word 确认。", Color.FromArgb(190, 120, 0));
+            if (!string.IsNullOrEmpty(ver)) Log(L.T("安装成功，当前版本 ") + ver, Color.FromArgb(0, 130, 60));
+            else Log(L.T("安装进程成功，但未读出版本号，请手动打开 Word 确认。"), Color.FromArgb(190, 120, 0));
 
             if (!keepSource)
             {
                 try
                 {
                     Directory.Delete(srcDir, true);
-                    Log("已删除安装源目录，释放磁盘空间");
+                    Log(L.T("已删除安装源目录，释放磁盘空间"));
                 }
                 catch
                 {
-                    Log("安装源删除失败，可手动删除: " + srcDir, Color.FromArgb(190, 120, 0));
+                    Log(L.T("安装源删除失败，可手动删除: ") + srcDir, Color.FromArgb(190, 120, 0));
                 }
             }
             else
             {
-                Log("安装源已保留: " + srcDir);
+                Log(L.T("安装源已保留: ") + srcDir);
             }
 
-            Report(100, "安装完成");
-            MessageBox.Show(prod.Name + " 安装完成。" + Environment.NewLine + "首次打开 Word / Excel 时按提示登录账号即可激活。",
-                "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Report(100, L.T("安装完成"));
+            MessageBox.Show(prod.Name + L.T(" 安装完成。") + Environment.NewLine + L.T("首次打开 Word / Excel 时按提示登录账号即可激活。"),
+                L.T("完成"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         void WaitForC2RIdle(int timeoutSec, CancellationToken ct)
@@ -1120,7 +1150,7 @@ namespace O365Installer
                 if (calm >= 2) return;
                 Thread.Sleep(2000);
             }
-            Log("等待 Office 客户端空闲超时，继续尝试", Color.FromArgb(190, 120, 0));
+            Log(L.T("等待 Office 客户端空闲超时，继续尝试"), Color.FromArgb(190, 120, 0));
         }
 
         async Task<int> RunInstallWithRetry(string setupExe, string args, string workDir, CancellationToken ct)
@@ -1129,20 +1159,20 @@ namespace O365Installer
             for (int attempt = 1; attempt <= 2; attempt++)
             {
                 await Task.Run(delegate { WaitForC2RIdle(300, ct); });
-                ReportText("正在安装... （第 " + attempt + " 次尝试）");
+                ReportText(L.T("正在安装... （第 ") + attempt + L.T(" 次尝试）"));
                 Stopwatch sw = Stopwatch.StartNew();
                 rc = await Task.Run(delegate { return RunSetup(setupExe, args, workDir, sw, ct); });
-                Log("安装进程返回码: " + rc + "（第 " + attempt + " 次）");
+                Log(L.T("安装进程返回码: ") + rc + L.T("（第 ") + attempt + L.T(" 次）"));
 
                 string nowVer = GetInstalledVersion();
                 if (!string.IsNullOrEmpty(nowVer))
                 {
-                    if (rc != 0) Log("进程返回 " + rc + "，但检测到 Office 已安装成功（" + nowVer + "），视为成功", Color.FromArgb(0, 130, 60));
+                    if (rc != 0) Log(L.T("进程返回 ") + rc + L.T("，但检测到 Office 已安装成功（") + nowVer + L.T("），视为成功"), Color.FromArgb(0, 130, 60));
                     return 0;
                 }
 
                 if (rc != 17004 || attempt == 2) return rc;
-                Log("17004 = 与另一个 Office 操作冲突，等待 30 秒后重试", Color.FromArgb(190, 120, 0));
+                Log(L.T("17004 = 与另一个 Office 操作冲突，等待 30 秒后重试"), Color.FromArgb(190, 120, 0));
                 await Task.Delay(30000, ct);
             }
             return rc;
@@ -1172,7 +1202,7 @@ namespace O365Installer
                     last = DateTime.Now;
                     double gb = DirSizeGB(srcDir);
                     int pct = 15 + (int)Math.Min(70.0, gb / 5.0 * 70.0);
-                    ReportText("下载安装文件 " + gb.ToString("F2") + " GB   已用 " + sw.Elapsed.ToString(@"mm\:ss"));
+                    ReportText(L.T("下载安装文件 ") + gb.ToString("F2") + L.T(" GB   已用 ") + sw.Elapsed.ToString(@"mm\:ss"));
                     Report(pct, lblStatus.Text);
                 }
                 return p.ExitCode;
@@ -1208,7 +1238,7 @@ namespace O365Installer
             bool append = resp.StatusCode == HttpStatusCode.PartialContent;
             if (!append) existing = 0;
             long total = existing + resp.ContentLength;
-            Log("服务器返回 " + (int)resp.StatusCode + "，总大小 " + (total / 1024.0 / 1024 / 1024).ToString("F2") + " GB");
+            Log(L.T("服务器返回 ") + (int)resp.StatusCode + L.T("，总大小 ") + (total / 1024.0 / 1024 / 1024).ToString("F2") + " GB");
 
             if (total > 0 && !string.IsNullOrEmpty(metaPath))
             {
@@ -1235,7 +1265,7 @@ namespace O365Installer
                         last = DateTime.Now;
                         int pct = 8;
                         if (total > 0) pct = 8 + (int)(80L * done / total);
-                        Report(pct, "下载中 " + (done / 1024.0 / 1024 / 1024).ToString("F2") + " / " + (total / 1024.0 / 1024 / 1024).ToString("F2") + " GB");
+                        Report(pct, L.T("下载中 ") + (done / 1024.0 / 1024 / 1024).ToString("F2") + " / " + (total / 1024.0 / 1024 / 1024).ToString("F2") + " GB");
                     }
                 }
             }
@@ -1257,7 +1287,7 @@ namespace O365Installer
                     ct.ThrowIfCancellationRequested();
                 }
                 Thread.Sleep(500);
-                ReportText("处理中... 已用时 " + sw.Elapsed.ToString(@"mm\:ss"));
+                ReportText(L.T("处理中... 已用时 ") + sw.Elapsed.ToString(@"mm\:ss"));
             }
             return p.ExitCode;
         }
@@ -1322,7 +1352,7 @@ namespace O365Installer
                         object ids = k.GetValue("ProductReleaseIds");
                         object ver = k.GetValue("VersionToReport");
                         if (ids != null)
-                            found.Add("即点即用版: " + ids + "  " + (ver == null ? "" : ver.ToString()));
+                            found.Add(L.T("即点即用版: ") + ids + "  " + (ver == null ? "" : ver.ToString()));
                     }
                 }
                 catch { }
@@ -1337,7 +1367,7 @@ namespace O365Installer
                     {
                         using (RegistryKey k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\" + pp + @"Microsoft\Office\" + v + @"\Word\InstallRoot"))
                         {
-                            if (k != null) found.Add("MSI 旧版: Office " + v);
+                            if (k != null) found.Add(L.T("MSI 旧版: Office ") + v);
                         }
                     }
                     catch { }

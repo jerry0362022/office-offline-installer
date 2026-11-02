@@ -9,7 +9,7 @@ $main = [IO.File]::ReadAllText((Join-Path $root 'src\Installer.cs'), [Text.Encod
 
 # 其余源文件只保留类型定义，using 已在主文件中
 $extra = ''
-foreach ($f in @('src\Products.cs', 'src\Common.cs', 'src\Consent.cs', 'src\Uninstall.cs', 'src\License.cs')) {
+foreach ($f in @('src\Lang.cs', 'src\Lang.en.cs', 'src\Lang.ja.cs', 'src\Lang.ko.cs', 'src\Products.cs', 'src\Common.cs', 'src\Consent.cs', 'src\Uninstall.cs', 'src\License.cs')) {
     $t = [IO.File]::ReadAllText((Join-Path $root $f), [Text.Encoding]::UTF8)
     $extra += ((($t -split "`r?`n") | Where-Object { $_ -notmatch '^\s*using\s+[\w\.]+\s*;\s*$' }) -join "`r`n") + "`r`n"
 }
