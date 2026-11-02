@@ -117,6 +117,12 @@ namespace O365Installer
                 b.FlatAppearance.BorderSize = 1;
             }
 
+            Panel pn = root as Panel;
+            if (pn != null && !(pn is CardPanel) && !(pn is SideNav))
+            {
+                pn.BackColor = Bg;
+            }
+
             TextBox tb = root as TextBox;
             if (tb != null)
             {
@@ -242,9 +248,6 @@ namespace O365Installer
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.Clear(BackColor);
-
-            using (SolidBrush b = new SolidBrush(Theme.Accent))
-                g.FillRectangle(b, 0, 0, 3, Height);
 
             TextRenderer.DrawText(g, "Office", new Font("Microsoft YaHei UI", 12F, FontStyle.Bold), new Point(20, 26), Theme.Text, TextFormatFlags.NoPadding);
             TextRenderer.DrawText(g, "Offline Installer", new Font("Microsoft YaHei UI", 8F), new Point(21, 50), Theme.SubText, TextFormatFlags.NoPadding);

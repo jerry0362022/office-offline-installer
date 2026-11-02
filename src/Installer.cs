@@ -17,8 +17,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyVersion("1.3.0.0")]
-[assembly: AssemblyFileVersion("1.3.0.0")]
+[assembly: AssemblyVersion("1.3.1.0")]
+[assembly: AssemblyFileVersion("1.3.1.0")]
 
 namespace O365Installer
 {
@@ -383,6 +383,8 @@ namespace O365Installer
         FlatProgress bar;
         RichTextBox log;
         CardPanel logWrap;
+        Panel installScroll;
+        CardGroup progressCard;
         FlatButton btnStart, btnCancel, btnLog, btnTheme;
         Dictionary<string, CheckBox> checks = new Dictionary<string, CheckBox>();
         CancellationTokenSource cts;
@@ -408,7 +410,7 @@ namespace O365Installer
                         Activate();
                         TopMost = true;
                         Application.DoEvents();
-                        Rectangle r = new Rectangle(0, 0, ClientSize.Width, ClientSize.Height);
+                        Rectangle r = new Rectangle(0, 0, ClientSize.Width, ClientSize.Height + 34);
                         Bitmap b = new Bitmap(r.Width, r.Height);
                         DrawToBitmap(b, r);
                         b.Save(Path.Combine(Path.GetTempPath(), "o365exe_ui.png"), ImageFormat.Png);
@@ -479,6 +481,7 @@ namespace O365Installer
 
             ShowPage(UiTestPage >= 0 ? UiTestPage : 0);
             Theme.Apply(this);
+            FitInstallPage();
             UpdateThemeButton();
             ActiveControl = null;
 
@@ -511,6 +514,25 @@ namespace O365Installer
             l.Location = new Point(x, y);
             parent.Controls.Add(l);
             return l;
+        }
+
+        void FitInstallPage()
+        {
+            if (installScroll == null || progressCard == null) return;
+            int have = installScroll.ClientSize.Height;
+            int need = progressCard.Bottom + 8;
+            if (need <= have) return;
+
+            int over = need - have;
+            int target = progressCard.Height - over;
+            if (target < 96) target = 96;
+            int delta = progressCard.Height - target;
+            progressCard.Height = target;
+            if (logWrap != null)
+            {
+                int lh = logWrap.Height - delta;
+                logWrap.Height = lh < 34 ? 34 : lh;
+            }
         }
 
         void AddPageHeader(Panel page, string title, string sub)
@@ -586,32 +608,32 @@ namespace O365Installer
             bottom.BackColor = Theme.Bg;
             page.Controls.Add(bottom);
 
-            Panel scroll = new Panel();
-            scroll.Dock = DockStyle.Fill;
-            scroll.AutoScroll = true;
-            scroll.BackColor = Theme.Bg;
-            page.Controls.Add(scroll);
-            page.Controls.SetChildIndex(scroll, 0);
+            installScroll = new Panel();
+            installScroll.Dock = DockStyle.Fill;
+            installScroll.AutoScroll = true;
+            installScroll.BackColor = Theme.Bg;
+            page.Controls.Add(installScroll);
+            page.Controls.SetChildIndex(installScroll, 0);
 
             Label hd = new Label();
             hd.Text = L.T("安装");
             hd.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
             hd.AutoSize = true;
             hd.Location = new Point(2, 0);
-            scroll.Controls.Add(hd);
+            installScroll.Controls.Add(hd);
 
             Label hs = new Label();
             hs.Text = L.T("选择产品与安装源，安装过程可随时取消");
             hs.Tag = "sub";
             hs.AutoSize = true;
             hs.Location = new Point(3, 38);
-            scroll.Controls.Add(hs);
+            installScroll.Controls.Add(hs);
 
             CardGroup ca = new CardGroup();
             ca.Text = L.T("产品与语言");
             ca.Location = new Point(0, 74);
             ca.Size = new Size(W, 150);
-            scroll.Controls.Add(ca);
+            installScroll.Controls.Add(ca);
 
             RowLabel(ca, L.T("产品"), 16, 32);
             cbProduct = new FlatCombo();
@@ -664,7 +686,7 @@ namespace O365Installer
             cb.Text = L.T("安装源");
             cb.Location = new Point(0, 232);
             cb.Size = new Size(W, 190);
-            scroll.Controls.Add(cb);
+            installScroll.Controls.Add(cb);
 
             rbImg = new RadioButton();
             rbImg.Text = L.T("离线镜像 (.img)");
@@ -728,7 +750,7 @@ namespace O365Installer
             cc.Text = L.T("要安装的组件（取消勾选 = 不安装）");
             cc.Location = new Point(0, 434);
             cc.Size = new Size(W, 104);
-            scroll.Controls.Add(cc);
+            installScroll.Controls.Add(cc);
 
             string[] on = new string[] { "Word", "Excel", "PowerPoint" };
             for (int i = 0; i < AppNames.Length; i++)
@@ -744,11 +766,12 @@ namespace O365Installer
                 checks[AppNames[i]] = c;
             }
 
-            CardGroup cd = new CardGroup();
+            progressCard = new CardGroup();
+            CardGroup cd = progressCard;
             cd.Text = L.T("进度与日志");
             cd.Location = new Point(0, 550);
             cd.Size = new Size(W, 156);
-            scroll.Controls.Add(cd);
+            installScroll.Controls.Add(cd);
 
             bar = new FlatProgress();
             bar.Location = new Point(16, 32);
