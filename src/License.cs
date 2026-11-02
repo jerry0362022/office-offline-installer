@@ -353,7 +353,7 @@ namespace O365Installer
             txtOut.BackColor = Color.FromArgb(252, 252, 253);
             Controls.Add(txtOut);
 
-            GroupBox g1 = new GroupBox();
+            GroupBox g1 = new CardGroup();
             g1.Text = L.T("产品密钥");
             g1.Location = new Point(16, 350);
             g1.Size = new Size(608, 70);
@@ -372,7 +372,7 @@ namespace O365Installer
             btnKey.Click += async delegate { await InstallKey(); };
             g1.Controls.Add(btnKey);
 
-            GroupBox g2 = new GroupBox();
+            GroupBox g2 = new CardGroup();
             g2.Text = L.T("KMS 主机（仅限使用你自己的授权服务器）");
             g2.Location = new Point(16, 428);
             g2.Size = new Size(608, 70);

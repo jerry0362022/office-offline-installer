@@ -17,8 +17,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyVersion("1.2.0.0")]
-[assembly: AssemblyFileVersion("1.2.0.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 
 namespace O365Installer
 {
@@ -125,6 +125,8 @@ namespace O365Installer
                 if (int.TryParse(args[1], out idx)) MainForm.UiTestProductIndex = idx;
                 int sw;
                 if (args.Length > 2 && int.TryParse(args[2], out sw)) MainForm.UiTestSwitchLang = sw;
+                int pg;
+                if (args.Length > 3 && int.TryParse(args[3], out pg)) MainForm.UiTestPage = pg;
             }
 
             if (!IsAdmin() && !uiTest)
@@ -198,6 +200,25 @@ namespace O365Installer
 
     class MainForm : Form
     {
+        [DllImport("dwmapi.dll")]
+        static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+        void ApplyDarkTitle()
+        {
+            try
+            {
+                int v = Theme.Dark ? 1 : 0;
+                DwmSetWindowAttribute(Handle, 20, ref v, 4);
+            }
+            catch { }
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ApplyDarkTitle();
+        }
+
 
         const string CdnBase = "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/";
         const string DefaultUrl = CdnBase + "zh-cn/O365ProPlusRetail.img";
@@ -305,11 +326,21 @@ namespace O365Installer
             return name + "  (" + code + ")";
         }
 
+        void UpdateThemeButton()
+        {
+            if (btnTheme == null) return;
+            btnTheme.Text = Theme.Dark ? ("\u2600  " + L.T("浅色")) : ("\u263E  " + L.T("深色"));
+        }
+
         void ToggleTheme()
         {
             Theme.Toggle();
             Theme.Apply(this);
-            btnTheme.Text = Theme.Dark ? "\u2600" : "\u263E";
+            if (embLicense != null) Theme.Apply(embLicense);
+            if (embUninstall != null) Theme.Apply(embUninstall);
+            if (nav != null) nav.Invalidate();
+            ApplyDarkTitle();
+            UpdateThemeButton();
             ActiveControl = null;
         }
 
@@ -360,6 +391,7 @@ namespace O365Installer
         List<ProductDef> catalog = Catalog.All();
         internal static int UiTestProductIndex = -1;
         internal static int UiTestSwitchLang = -1;
+        internal static int UiTestPage = -1;
 
         public MainForm(bool uiTest)
         {
@@ -390,93 +422,232 @@ namespace O365Installer
             }
         }
 
+        SideNav nav;
+        Panel pageHost, pageInstall, pageActivation, pageUninstall, pageSettings, pageAbout;
+        LicenseForm embLicense;
+        UninstallForm embUninstall;
+
         void BuildUi()
         {
-            Font f = new Font("Microsoft YaHei UI", 9F);
             Text = L.T("Office 离线安装器");
-            ClientSize = new Size(744, 606);
+            int winH = 800;
+            int avail = Screen.PrimaryScreen.WorkingArea.Height;
+            if (winH > avail - 60) winH = avail - 60;
+            ClientSize = new Size(1000, winH);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
-            Font = f;
+            Font = new Font("Microsoft YaHei UI", 9F);
             BackColor = Theme.Bg;
 
-            Label title = new Label();
-            title.Text = L.T("Office 离线安装器");
-            title.Font = new Font("Microsoft YaHei UI", 15F, FontStyle.Bold);
-            title.Location = new Point(16, 12);
-            title.AutoSize = true;
-            Controls.Add(title);
+            pageHost = new Panel();
+            pageHost.Dock = DockStyle.Fill;
+            pageHost.BackColor = Theme.Bg;
+            pageHost.Padding = new Padding(30, 20, 30, 16);
+            Controls.Add(pageHost);
 
-            Label sub = new Label();
-            sub.Text = L.T("Office 2016–2024 与 Microsoft 365，支持官方离线镜像和 ODT 在线下载");
-            sub.ForeColor = Color.FromArgb(120, 125, 135);
-            sub.Location = new Point(18, 42);
-            sub.AutoSize = true;
-            sub.Tag = "sub";
-            Controls.Add(sub);
+            nav = new SideNav();
+            nav.Dock = DockStyle.Left;
+            nav.Add("\uE80F", L.T("安装"));
+            nav.Add("\uE8D7", L.T("授权管理"));
+            nav.Add("\uE74D", L.T("卸载旧版"));
+            nav.Add("\uE713", L.T("设置"));
+            nav.Add("\uE946", L.T("关于"));
+            nav.SelectedIndex = 0;
+            nav.SelectedIndexChanged += delegate { ShowPage(nav.SelectedIndex); };
+            Controls.Add(nav);
 
-            cbUiLang = new FlatCombo();
-            cbUiLang.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbUiLang.Location = new Point(548, 14);
-            cbUiLang.Size = new Size(116, 24);
-            for (int i = 0; i < L.NativeNames.Length; i++) cbUiLang.Items.Add(L.NativeNames[i]);
-            cbUiLang.SelectedIndex = L.Index;
-            cbUiLang.SelectedIndexChanged += delegate { OnUiLangChanged(); };
-            Controls.Add(cbUiLang);
+            pageInstall = NewPage();
+            pageActivation = NewPage();
+            pageUninstall = NewPage();
+            pageSettings = NewPage();
+            pageAbout = NewPage();
 
-            btnTheme = new FlatButton();
-            btnTheme.Location = new Point(672, 14);
-            btnTheme.Size = new Size(56, 28);
-            btnTheme.Font = Theme.UiFont(12F, FontStyle.Regular);
-            btnTheme.Text = Theme.Dark ? "\u2600" : "\u263E";
-            btnTheme.Click += delegate { ToggleTheme(); };
-            Controls.Add(btnTheme);
+            BuildInstallPage(pageInstall);
+            AddPageHeader(pageActivation, L.T("授权管理"), L.T("查询授权状态、安装密钥、配置 KMS 主机"));
+            AddPageHeader(pageUninstall, L.T("卸载旧版"), L.T("清理残留的即点即用版或 MSI 版 Office"));
+            BuildSettingsPage(pageSettings);
+            BuildAboutPage(pageAbout);
 
-            CardGroup g1 = new CardGroup();
-            g1.Text = L.T("安装选项");
-            g1.Location = new Point(16, 68);
-            g1.Size = new Size(336, 168);
-            Controls.Add(g1);
+            pageHost.Controls.Add(pageInstall);
+            pageHost.Controls.Add(pageActivation);
+            pageHost.Controls.Add(pageUninstall);
+            pageHost.Controls.Add(pageSettings);
+            pageHost.Controls.Add(pageAbout);
 
-            AddLabel(g1, L.T("产品"), 14, 30);
+            if (UiTestSwitchLang >= 0 && UiTestSwitchLang <= 3) cbUiLang.SelectedIndex = UiTestSwitchLang;
+
+            ShowPage(UiTestPage >= 0 ? UiTestPage : 0);
+            Theme.Apply(this);
+            UpdateThemeButton();
+            ActiveControl = null;
+
+            FormClosing += delegate(object s, FormClosingEventArgs e)
+            {
+                if (busy)
+                {
+                    DialogResult r = MessageBox.Show(L.T("安装正在进行，确定要退出吗？"), L.T("确认"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                    if (r != DialogResult.Yes) e.Cancel = true;
+                    else if (cts != null) cts.Cancel();
+                }
+            };
+        }
+
+        Panel NewPage()
+        {
+            Panel p = new Panel();
+            p.Dock = DockStyle.Fill;
+            p.BackColor = Theme.Bg;
+            p.AutoScroll = true;
+            p.Visible = false;
+            return p;
+        }
+
+        Label RowLabel(Control parent, string text, int x, int y)
+        {
+            Label l = new Label();
+            l.Text = text;
+            l.AutoSize = true;
+            l.Location = new Point(x, y);
+            parent.Controls.Add(l);
+            return l;
+        }
+
+        void AddPageHeader(Panel page, string title, string sub)
+        {
+            Label hd = new Label();
+            hd.Text = title;
+            hd.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
+            hd.AutoSize = true;
+            hd.Location = new Point(2, 0);
+            page.Controls.Add(hd);
+
+            Label hs = new Label();
+            hs.Text = sub;
+            hs.Tag = "sub";
+            hs.AutoSize = true;
+            hs.Location = new Point(3, 38);
+            page.Controls.Add(hs);
+        }
+
+        void ShowPage(int i)
+        {
+            Panel[] pages = new Panel[] { pageInstall, pageActivation, pageUninstall, pageSettings, pageAbout };
+            for (int k = 0; k < pages.Length; k++) if (pages[k] != null) pages[k].Visible = (k == i);
+
+            if (i == 1 && embLicense == null)
+            {
+                embLicense = new LicenseForm();
+                embLicense.TopLevel = false;
+                embLicense.FormBorderStyle = FormBorderStyle.None;
+                embLicense.Location = new Point(0, 66);
+                embLicense.BackColor = Theme.Bg;
+                pageActivation.Controls.Add(embLicense);
+                embLicense.Show();
+                HideDialogs(embLicense);
+            }
+
+            if (i == 2 && embUninstall == null)
+            {
+                embUninstall = new UninstallForm();
+                embUninstall.TopLevel = false;
+                embUninstall.FormBorderStyle = FormBorderStyle.None;
+                embUninstall.Location = new Point(0, 66);
+                embUninstall.BackColor = Theme.Bg;
+                pageUninstall.Controls.Add(embUninstall);
+                embUninstall.Show();
+                HideDialogs(embUninstall);
+            }
+
+            if (nav != null)
+            {
+                nav.SelectedIndex = i;
+                nav.Invalidate();
+            }
+            ActiveControl = null;
+        }
+
+        static void HideDialogs(Form f)
+        {
+            foreach (Control c in f.Controls)
+            {
+                Button b = c as Button;
+                if (b != null && b.DialogResult != DialogResult.None) b.Visible = false;
+            }
+        }
+
+        void BuildInstallPage(Panel page)
+        {
+            int W = 728;
+
+            Panel bottom = new Panel();
+            bottom.Dock = DockStyle.Bottom;
+            bottom.Height = 58;
+            bottom.BackColor = Theme.Bg;
+            page.Controls.Add(bottom);
+
+            Panel scroll = new Panel();
+            scroll.Dock = DockStyle.Fill;
+            scroll.AutoScroll = true;
+            scroll.BackColor = Theme.Bg;
+            page.Controls.Add(scroll);
+            page.Controls.SetChildIndex(scroll, 0);
+
+            Label hd = new Label();
+            hd.Text = L.T("安装");
+            hd.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
+            hd.AutoSize = true;
+            hd.Location = new Point(2, 0);
+            scroll.Controls.Add(hd);
+
+            Label hs = new Label();
+            hs.Text = L.T("选择产品与安装源，安装过程可随时取消");
+            hs.Tag = "sub";
+            hs.AutoSize = true;
+            hs.Location = new Point(3, 38);
+            scroll.Controls.Add(hs);
+
+            CardGroup ca = new CardGroup();
+            ca.Text = L.T("产品与语言");
+            ca.Location = new Point(0, 74);
+            ca.Size = new Size(W, 150);
+            scroll.Controls.Add(ca);
+
+            RowLabel(ca, L.T("产品"), 16, 32);
             cbProduct = new FlatCombo();
-            cbProduct.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbProduct.Location = new Point(72, 26);
-            cbProduct.Size = new Size(246, 24);
-            cbProduct.DropDownWidth = 340;
+            cbProduct.Location = new Point(394, 26);
+            cbProduct.Size = new Size(302, 24);
+            cbProduct.DropDownWidth = 380;
             cbProduct.MaxDropDownItems = 20;
             foreach (ProductDef p in catalog) cbProduct.Items.Add(L.T(p.Name));
             cbProduct.SelectedIndex = 0;
             if (UiTestProductIndex >= 0 && UiTestProductIndex < catalog.Count) cbProduct.SelectedIndex = UiTestProductIndex;
-            g1.Controls.Add(cbProduct);
+            ca.Controls.Add(cbProduct);
 
-            AddLabel(g1, L.T("语言"), 14, 66);
+            RowLabel(ca, L.T("语言"), 16, 72);
             cbLang = new FlatCombo();
-            cbLang.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbLang.Location = new Point(84, 62);
-            cbLang.Size = new Size(140, 24);
-            cbLang.DropDownWidth = 240;
-            g1.Controls.Add(cbLang);
+            cbLang.Location = new Point(394, 66);
+            cbLang.Size = new Size(200, 24);
+            cbLang.DropDownWidth = 300;
+            ca.Controls.Add(cbLang);
             FillLanguages();
 
-            AddLabel(g1, L.T("位数"), 232, 66);
+            RowLabel(ca, L.T("位数"), 606, 72);
             cbArch = new FlatCombo();
-            cbArch.DropDownStyle = ComboBoxStyle.DropDownList;
-            cbArch.Location = new Point(268, 62);
-            cbArch.Size = new Size(60, 24);
+            cbArch.Location = new Point(652, 66);
+            cbArch.Size = new Size(62, 24);
             cbArch.Items.Add("64");
             cbArch.Items.Add("32");
             cbArch.SelectedIndex = 0;
-            g1.Controls.Add(cbArch);
+            ca.Controls.Add(cbArch);
 
             lblHint = new Label();
             lblHint.Tag = "warn";
             lblHint.Font = new Font("Microsoft YaHei UI", 8F);
-            lblHint.Location = new Point(14, 96);
-            lblHint.Size = new Size(312, 64);
+            lblHint.Location = new Point(16, 102);
+            lblHint.Size = new Size(696, 40);
             lblHint.Text = HintText();
-            g1.Controls.Add(lblHint);
+            ca.Controls.Add(lblHint);
 
             cbProduct.SelectedIndexChanged += delegate
             {
@@ -489,107 +660,114 @@ namespace O365Installer
             };
             cbLang.SelectedIndexChanged += delegate { if (!applying) AutoFillUrl(); };
 
-            CardGroup g2 = new CardGroup();
-            g2.Text = L.T("安装源");
-            g2.Location = new Point(364, 68);
-            g2.Size = new Size(364, 168);
-            Controls.Add(g2);
+            CardGroup cb = new CardGroup();
+            cb.Text = L.T("安装源");
+            cb.Location = new Point(0, 232);
+            cb.Size = new Size(W, 190);
+            scroll.Controls.Add(cb);
 
             rbImg = new RadioButton();
             rbImg.Text = L.T("离线镜像 (.img)");
-            rbImg.Location = new Point(14, 22);
+            rbImg.Location = new Point(16, 28);
             rbImg.AutoSize = true;
             rbImg.Checked = true;
-            g2.Controls.Add(rbImg);
+            rbImg.Tag = "radio";
+            cb.Controls.Add(rbImg);
 
             rbOdt = new RadioButton();
             rbOdt.Text = L.T("ODT 在线下载");
-            rbOdt.Location = new Point(206, 22);
+            rbOdt.Location = new Point(200, 28);
             rbOdt.AutoSize = true;
-            g2.Controls.Add(rbOdt);
+            rbOdt.Tag = "radio";
+            cb.Controls.Add(rbOdt);
 
             lblUrl = new Label();
             lblUrl.Text = L.T("镜像链接 (.img)");
-            lblUrl.Location = new Point(14, 52);
+            lblUrl.Location = new Point(16, 62);
             lblUrl.AutoSize = true;
-            g2.Controls.Add(lblUrl);
+            cb.Controls.Add(lblUrl);
 
             tbUrl = new TextBox();
-            tbUrl.Location = new Point(14, 70);
-            tbUrl.Size = new Size(336, 24);
+            tbUrl.Location = new Point(16, 82);
+            tbUrl.Size = new Size(696, 24);
             tbUrl.Text = DefaultUrl;
             tbUrl.BackColor = Theme.Field;
             tbUrl.ForeColor = Theme.Text;
-            g2.Controls.Add(tbUrl);
+            cb.Controls.Add(tbUrl);
 
             lblSourcePath = new Label();
             lblSourcePath.Text = L.T("安装源将下载到: ") + Path.Combine(WorkDir, "source");
             lblSourcePath.Tag = "sub";
             lblSourcePath.Font = new Font("Microsoft YaHei UI", 8F);
-            lblSourcePath.Location = new Point(14, 52);
-            lblSourcePath.Size = new Size(336, 48);
+            lblSourcePath.Location = new Point(16, 62);
+            lblSourcePath.Size = new Size(696, 44);
             lblSourcePath.AutoEllipsis = true;
             lblSourcePath.Visible = false;
-            g2.Controls.Add(lblSourcePath);
+            cb.Controls.Add(lblSourcePath);
 
-            chkKeep = new CheckBox();
+            chkKeep = new FlatCheck();
             chkKeep.Text = L.T("完成后保留安装源（便于给其他电脑用）");
-            chkKeep.Location = new Point(14, 102);
-            chkKeep.AutoSize = true;
-            g2.Controls.Add(chkKeep);
+            chkKeep.Location = new Point(16, 118);
+            chkKeep.Size = new Size(500, 24);
+            cb.Controls.Add(chkKeep);
 
             Label l5 = new Label();
             l5.Text = L.T("临时文件: ") + WorkDir;
             l5.Tag = "sub";
             l5.Font = new Font("Microsoft YaHei UI", 8F);
-            l5.Location = new Point(14, 141);
-            l5.Size = new Size(336, 18);
+            l5.Location = new Point(16, 152);
+            l5.Size = new Size(696, 18);
             l5.AutoEllipsis = true;
-            g2.Controls.Add(l5);
+            cb.Controls.Add(l5);
 
             rbImg.CheckedChanged += delegate { if (!applying) ToggleMode(); };
             rbOdt.CheckedChanged += delegate { if (!applying) ToggleMode(); };
             ToggleMode();
 
-            CardGroup g3 = new CardGroup();
-            g3.Text = L.T("要安装的组件（取消勾选 = 不安装）");
-            g3.Location = new Point(16, 246);
-            g3.Size = new Size(712, 96);
-            Controls.Add(g3);
+            CardGroup cc = new CardGroup();
+            cc.Text = L.T("要安装的组件（取消勾选 = 不安装）");
+            cc.Location = new Point(0, 434);
+            cc.Size = new Size(W, 104);
+            scroll.Controls.Add(cc);
 
             string[] on = new string[] { "Word", "Excel", "PowerPoint" };
             for (int i = 0; i < AppNames.Length; i++)
             {
                 int col = i % 5;
                 int row = i / 5;
-                CheckBox c = new CheckBox();
+                FlatCheck c = new FlatCheck();
                 c.Text = AppNames[i];
-                c.AutoSize = true;
-                c.CheckAlign = ContentAlignment.MiddleLeft;
-                c.Location = new Point(14 + col * 140, 26 + row * 34);
+                c.Size = new Size(132, 24);
+                c.Location = new Point(16 + col * 140, 30 + row * 36);
                 foreach (string o in on) if (o == AppNames[i]) c.Checked = true;
-                g3.Controls.Add(c);
+                cc.Controls.Add(c);
                 checks[AppNames[i]] = c;
             }
 
+            CardGroup cd = new CardGroup();
+            cd.Text = L.T("进度与日志");
+            cd.Location = new Point(0, 550);
+            cd.Size = new Size(W, 156);
+            scroll.Controls.Add(cd);
+
             bar = new FlatProgress();
-            bar.Location = new Point(16, 356);
-            bar.Size = new Size(712, 10);
+            bar.Location = new Point(16, 32);
+            bar.Size = new Size(696, 10);
             bar.Maximum = 100;
-            Controls.Add(bar);
+            cd.Controls.Add(bar);
 
             lblStatus = new Label();
             lblStatus.Text = L.T("就绪");
-            lblStatus.Location = new Point(16, 372);
-            lblStatus.Size = new Size(712, 20);
-            lblStatus.ForeColor = Color.FromArgb(80, 85, 95);
-            Controls.Add(lblStatus);
+            lblStatus.Location = new Point(16, 48);
+            lblStatus.Size = new Size(696, 20);
+            lblStatus.Tag = "sub";
+            cd.Controls.Add(lblStatus);
 
             logWrap = new CardPanel();
-            logWrap.Location = new Point(16, 394);
-            logWrap.Size = new Size(712, 152);
-            logWrap.Padding = new Padding(12, 10, 8, 10);
-            Controls.Add(logWrap);
+            logWrap.Location = new Point(16, 74);
+            logWrap.Size = new Size(696, 68);
+            logWrap.Padding = new Padding(10, 8, 6, 8);
+            cd.Controls.Add(logWrap);
 
             log = new RichTextBox();
             log.Dock = DockStyle.Fill;
@@ -598,107 +776,150 @@ namespace O365Installer
             log.ScrollBars = RichTextBoxScrollBars.Vertical;
             logWrap.Controls.Add(log);
 
-            btnStart = new FlatButton();
-            btnStart.Primary = true;
-            btnStart.Text = L.T("开始安装");
-            btnStart.Location = new Point(534, 556);
-            btnStart.Size = new Size(104, 34);
-            btnStart.Click += OnStartClick;
-            Controls.Add(btnStart);
-
-            btnCancel = new FlatButton();
-            btnCancel.Text = L.T("取消");
-            btnCancel.Location = new Point(646, 556);
-            btnCancel.Size = new Size(82, 34);
-            btnCancel.Enabled = false;
-            btnCancel.Click += delegate
-            {
-                if (cts != null) cts.Cancel();
-                lblStatus.Text = L.T("正在取消...");
-            };
-            Controls.Add(btnCancel);
-
             btnLog = new FlatButton();
             btnLog.Text = L.T("打开日志目录");
-            btnLog.Location = new Point(16, 556);
+            btnLog.Location = new Point(0, 12);
             btnLog.Size = new Size(116, 34);
             btnLog.Click += delegate
             {
                 string d = Directory.Exists(LogDir) ? LogDir : WorkDir;
                 if (Directory.Exists(d)) Process.Start("explorer.exe", "\"" + d + "\"");
             };
-            Controls.Add(btnLog);
+            bottom.Controls.Add(btnLog);
 
-            FlatButton btnLicense = new FlatButton();
-            btnLicense.Text = L.T("授权管理");
-            btnLicense.Location = new Point(140, 556);
-            btnLicense.Size = new Size(116, 34);
-            btnLicense.Click += delegate
+            btnStart = new FlatButton();
+            btnStart.Primary = true;
+            btnStart.Text = L.T("开始安装");
+            btnStart.Location = new Point(508, 12);
+            btnStart.Size = new Size(112, 34);
+            btnStart.Click += OnStartClick;
+            bottom.Controls.Add(btnStart);
+
+            btnCancel = new FlatButton();
+            btnCancel.Text = L.T("取消");
+            btnCancel.Location = new Point(630, 12);
+            btnCancel.Size = new Size(98, 34);
+            btnCancel.Enabled = false;
+            btnCancel.Click += delegate
             {
-                using (LicenseForm lf = new LicenseForm())
-                {
-                    lf.ShowDialog(this);
-                }
+                if (cts != null) cts.Cancel();
+                lblStatus.Text = L.T("正在取消...");
             };
-            Controls.Add(btnLicense);
+            bottom.Controls.Add(btnCancel);
+        }
 
-            FlatButton btnUninstall = new FlatButton();
-            btnUninstall.Text = L.T("卸载旧版");
-            btnUninstall.Location = new Point(264, 556);
-            btnUninstall.Size = new Size(126, 34);
-            btnUninstall.Click += delegate
+        void BuildSettingsPage(Panel page)
+        {
+            int W = 728;
+
+            Label hd = new Label();
+            hd.Text = L.T("设置");
+            hd.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
+            hd.AutoSize = true;
+            hd.Location = new Point(2, 0);
+            page.Controls.Add(hd);
+
+            Label hs = new Label();
+            hs.Text = L.T("界面语言与外观");
+            hs.Tag = "sub";
+            hs.AutoSize = true;
+            hs.Location = new Point(3, 38);
+            page.Controls.Add(hs);
+
+            CardGroup ca = new CardGroup();
+            ca.Text = L.T("界面");
+            ca.Location = new Point(0, 74);
+            ca.Size = new Size(W, 140);
+            page.Controls.Add(ca);
+
+            RowLabel(ca, L.T("界面语言"), 16, 32);
+            cbUiLang = new FlatCombo();
+            cbUiLang.Location = new Point(394, 26);
+            cbUiLang.Size = new Size(302, 24);
+            for (int i = 0; i < L.NativeNames.Length; i++) cbUiLang.Items.Add(L.NativeNames[i]);
+            cbUiLang.SelectedIndex = L.Index;
+            cbUiLang.SelectedIndexChanged += delegate { OnUiLangChanged(); };
+            ca.Controls.Add(cbUiLang);
+
+            RowLabel(ca, L.T("主题"), 16, 72);
+            btnTheme = new FlatButton();
+            btnTheme.Location = new Point(394, 66);
+            btnTheme.Size = new Size(150, 30);
+            UpdateThemeButton();
+            btnTheme.Click += delegate { ToggleTheme(); };
+            ca.Controls.Add(btnTheme);
+
+            CardGroup cb = new CardGroup();
+            cb.Text = L.T("维护");
+            cb.Location = new Point(0, 226);
+            cb.Size = new Size(W, 110);
+            page.Controls.Add(cb);
+
+            FlatButton b1 = new FlatButton();
+            b1.Text = L.T("打开日志目录");
+            b1.Location = new Point(16, 36);
+            b1.Size = new Size(150, 34);
+            b1.Click += delegate
             {
-                using (UninstallForm uf = new UninstallForm())
-                {
-                    uf.ShowDialog(this);
-                }
+                string d = Directory.Exists(LogDir) ? LogDir : WorkDir;
+                if (Directory.Exists(d)) Process.Start("explorer.exe", "\"" + d + "\"");
             };
-            Controls.Add(btnUninstall);
+            cb.Controls.Add(b1);
 
-            FlatButton btnAbout = new FlatButton();
-            btnAbout.Text = L.T("声明");
-            btnAbout.Location = new Point(398, 556);
-            btnAbout.Size = new Size(90, 34);
-            btnAbout.Click += delegate
+            FlatButton b2 = new FlatButton();
+            b2.Text = L.T("查看免责声明");
+            b2.Location = new Point(178, 36);
+            b2.Size = new Size(150, 34);
+            b2.Click += delegate
             {
                 using (ConsentForm cf = new ConsentForm(false)) cf.ShowDialog(this);
             };
-            Controls.Add(btnAbout);
+            cb.Controls.Add(b2);
+        }
 
-            if (UiTestSwitchLang >= 0 && UiTestSwitchLang <= 3) cbUiLang.SelectedIndex = UiTestSwitchLang;
-            Theme.Apply(this);
-            btnTheme.Text = Theme.Dark ? "\u2600" : "\u263E";
-            ActiveControl = null;
+        void BuildAboutPage(Panel page)
+        {
+            Label hd = new Label();
+            hd.Text = L.T("关于");
+            hd.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
+            hd.AutoSize = true;
+            hd.Location = new Point(2, 0);
+            page.Controls.Add(hd);
 
-            int avail = Screen.PrimaryScreen.WorkingArea.Height;
-            int over = Height - avail + 6;
-            if (over > 0)
-            {
-                int newLogH = logWrap.Height - over;
-                if (newLogH < 82) newLogH = 82;
-                int shift = logWrap.Height - newLogH;
-                if (shift > 0)
-                {
-                    logWrap.Height = newLogH;
-                    btnStart.Top -= shift;
-                    btnCancel.Top -= shift;
-                    btnLog.Top -= shift;
-                    btnLicense.Top -= shift;
-                    btnUninstall.Top -= shift;
-                    btnAbout.Top -= shift;
-                    ClientSize = new Size(ClientSize.Width, ClientSize.Height - shift);
-                }
-            }
+            CardGroup ca = new CardGroup();
+            ca.Text = L.T("Office 离线安装器");
+            ca.Location = new Point(0, 74);
+            ca.Size = new Size(728, 190);
+            page.Controls.Add(ca);
 
-            FormClosing += delegate(object s, FormClosingEventArgs e)
-            {
-                if (busy)
-                {
-                    DialogResult r = MessageBox.Show(L.T("安装正在进行，确定要退出吗？"), L.T("确认"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-                    if (r != DialogResult.Yes) e.Cancel = true;
-                    else if (cts != null) cts.Cancel();
-                }
-            };
+            Label l1 = new Label();
+            l1.Text = "v" + Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            l1.Tag = "sub";
+            l1.AutoSize = true;
+            l1.Location = new Point(16, 32);
+            ca.Controls.Add(l1);
+
+            Label l2 = new Label();
+            l2.Text = L.T("封装微软官方 ODT，安装源来自 officecdn.microsoft.com，不提供任何激活绕过。");
+            l2.Tag = "sub";
+            l2.AutoSize = false;
+            l2.Size = new Size(696, 44);
+            l2.Location = new Point(16, 58);
+            ca.Controls.Add(l2);
+
+            Label l3 = new Label();
+            l3.Text = "github.com/jerry0362022/office-offline-installer";
+            l3.Tag = "sub";
+            l3.AutoSize = true;
+            l3.Location = new Point(16, 112);
+            ca.Controls.Add(l3);
+
+            Label l4 = new Label();
+            l4.Text = L.T("MIT 许可 · 与微软公司无隶属或背书关系");
+            l4.Tag = "sub";
+            l4.AutoSize = true;
+            l4.Location = new Point(16, 140);
+            ca.Controls.Add(l4);
         }
 
         string HintText()

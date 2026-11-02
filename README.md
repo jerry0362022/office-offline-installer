@@ -12,7 +12,7 @@
 
 主界面：产品 / 语言 / 位数选择，组件勾选，安装源（离线镜像或 ODT 下载），进度与实时日志。
 
-卡片式分组，右上角可切换语言与明暗主题，选择会被记住（`%LOCALAPPDATA%\OfficeOfflineInstaller\`）。
+左侧导航分「安装 / 授权管理 / 卸载旧版 / 设置 / 关于」五个页面；卡片式布局，明暗双主题，语言与主题选择会被记住（`%LOCALAPPDATA%\OfficeOfflineInstaller\`）。
 
 ## 界面语言
 

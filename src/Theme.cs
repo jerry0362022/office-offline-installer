@@ -75,6 +75,19 @@ namespace O365Installer
                 f.ForeColor = Text;
             }
 
+            SideNav sn = root as SideNav;
+            if (sn != null)
+            {
+                sn.BackColor = Card;
+                sn.Invalidate();
+            }
+
+            FlatProgress fp = root as FlatProgress;
+            if (fp != null) fp.Invalidate();
+
+            FlatCheck fc = root as FlatCheck;
+            if (fc != null) fc.Invalidate();
+
             CardPanel cp = root as CardPanel;
             if (cp != null)
             {
@@ -163,6 +176,149 @@ namespace O365Installer
             p.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
             p.CloseFigure();
             return p;
+        }
+    }
+
+    class NavEntry
+    {
+        public string Glyph;
+        public string Text;
+        public NavEntry(string g, string t) { Glyph = g; Text = t; }
+    }
+
+    class SideNav : Panel
+    {
+        public readonly List<NavEntry> Items = new List<NavEntry>();
+        public int SelectedIndex = 0;
+        public event EventHandler SelectedIndexChanged;
+        int hover = -1;
+
+        public SideNav()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            Width = 212;
+            BackColor = Theme.Card;
+        }
+
+        public void Add(string glyph, string text)
+        {
+            Items.Add(new NavEntry(glyph, text));
+            Invalidate();
+        }
+
+        int Top0 { get { return 92; } }
+        int ItemH { get { return 44; } }
+
+        int HitTest(int y)
+        {
+            int i = (y - Top0) / ItemH;
+            if (y < Top0 || i < 0 || i >= Items.Count) return -1;
+            return i;
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            int i = HitTest(e.Y);
+            if (i != hover) { hover = i; Invalidate(); Cursor = i >= 0 ? Cursors.Hand : Cursors.Default; }
+            base.OnMouseMove(e);
+        }
+
+        protected override void OnMouseLeave(EventArgs e) { hover = -1; Invalidate(); base.OnMouseLeave(e); }
+
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            int i = HitTest(e.Y);
+            if (i >= 0 && i != SelectedIndex)
+            {
+                SelectedIndex = i;
+                Invalidate();
+                if (SelectedIndexChanged != null) SelectedIndexChanged(this, EventArgs.Empty);
+            }
+            base.OnMouseClick(e);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(BackColor);
+
+            using (SolidBrush b = new SolidBrush(Theme.Accent))
+                g.FillRectangle(b, 0, 0, 3, Height);
+
+            TextRenderer.DrawText(g, "Office", new Font("Microsoft YaHei UI", 12F, FontStyle.Bold), new Point(20, 26), Theme.Text, TextFormatFlags.NoPadding);
+            TextRenderer.DrawText(g, "Offline Installer", new Font("Microsoft YaHei UI", 8F), new Point(21, 50), Theme.SubText, TextFormatFlags.NoPadding);
+
+            Font icon = new Font("Segoe MDL2 Assets", 11F);
+            Font text = new Font("Microsoft YaHei UI", 9.5F);
+
+            for (int i = 0; i < Items.Count; i++)
+            {
+                Rectangle r = new Rectangle(12, Top0 + i * ItemH, Width - 24, 38);
+                bool sel = i == SelectedIndex;
+
+                if (sel)
+                {
+                    using (GraphicsPath p = Theme.Round(r, 8))
+                    using (SolidBrush b = new SolidBrush(Theme.Dark ? Color.FromArgb(0x25, 0x2C, 0x38) : Color.FromArgb(0xE8, 0xEF, 0xFE)))
+                        g.FillPath(b, p);
+                }
+                else if (i == hover)
+                {
+                    using (GraphicsPath p = Theme.Round(r, 8))
+                    using (SolidBrush b = new SolidBrush(Theme.Dark ? Color.FromArgb(0x24, 0x29, 0x31) : Color.FromArgb(0xF2, 0xF4, 0xF7)))
+                        g.FillPath(b, p);
+                }
+
+                Color fg = sel ? Theme.Accent : (Theme.Dark ? Color.FromArgb(0xC3, 0xC9, 0xD2) : Color.FromArgb(0x4A, 0x51, 0x5B));
+                TextRenderer.DrawText(g, Items[i].Glyph, icon, new Point(r.X + 14, r.Y + 10), fg);
+                TextRenderer.DrawText(g, Items[i].Text, text, new Rectangle(r.X + 44, r.Y, r.Width - 50, r.Height), fg,
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            }
+
+            using (Pen pen = new Pen(Theme.Border)) g.DrawLine(pen, Width - 1, 0, Width - 1, Height);
+        }
+    }
+
+    class FlatCheck : CheckBox
+    {
+        public FlatCheck()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            AutoSize = false;
+            Height = 24;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Parent != null ? Parent.BackColor : Theme.Card);
+
+            Rectangle box = new Rectangle(0, (Height - 18) / 2, 18, 18);
+            using (GraphicsPath p = Theme.Round(box, 4))
+            using (SolidBrush b = new SolidBrush(Checked ? Theme.Accent : (Theme.Dark ? Color.FromArgb(0x23, 0x29, 0x32) : Color.White)))
+            using (Pen pen = new Pen(Checked ? Theme.Accent : Theme.Border))
+            {
+                g.FillPath(b, p);
+                g.DrawPath(pen, p);
+            }
+
+            if (Checked)
+            {
+                using (Pen pen = new Pen(Theme.AccentText, 1.8f))
+                {
+                    pen.StartCap = LineCap.Round;
+                    pen.EndCap = LineCap.Round;
+                    g.DrawLines(pen, new Point[] {
+                        new Point(box.X + 4, box.Y + 9),
+                        new Point(box.X + 8, box.Y + 13),
+                        new Point(box.X + 14, box.Y + 5) });
+                }
+            }
+
+            TextRenderer.DrawText(g, Text, Font, new Rectangle(26, 0, Width - 26, Height), Theme.Text,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         }
     }
 
